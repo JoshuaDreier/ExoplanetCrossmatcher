@@ -1,0 +1,8 @@
+astropy
+astroquery
+provider
+matplotlib
+jupyter
+pyvo
+pytest
+provider
