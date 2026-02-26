@@ -6,3 +6,5 @@ jupyter
 pyvo
 pytest
 provider
+pyarrow
+pandas
