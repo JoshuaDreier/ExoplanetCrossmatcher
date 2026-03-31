@@ -21,6 +21,7 @@ class Crossmatcher:
         Initialize crossmatcher.
         """
         # TODO: caching currently very primitive, should be improved
+        # TODO: proper customization of keys and URLS
         self.catalogue = Table()
         self.catalogue_cached = False
         self.alternate_ids = Table()
@@ -34,6 +35,8 @@ class Crossmatcher:
         self.planet_uuid = "pl_name"
         self.input_starname_key = "star_name"
         self.catalogue_starname_key = "hostname"
+        self.search_radius_arcsec = 15*u.arcsec
+        self.search_radius_pc = 0.005*u.pc # corresponds to around 82 arcsec at 10 pc 
     
     def load_catalog(self, from_file=None, format="ascii") -> Table:
         if from_file is not None:
@@ -44,7 +47,7 @@ class Crossmatcher:
         nasa = pyvo.dal.TAPService("https://exoplanetarchive.ipac.caltech.edu/TAP")
         self.catalogue = nasa.run_sync(
             "SELECT * FROM pscomppars"
-        )
+        ).to_table()
         self.catalogue_cached = True
         return self.catalogue
 
@@ -74,7 +77,7 @@ class Crossmatcher:
     def id_crossmatch(self, input_table):
         name_list = input_table[self.input_starname_key].tolist()
         if not self.alternate_ids_cached:
-            self.get_alternate_id_list(name_list)
+            self.load_alternate_ids(name_list)
         if not self.catalogue_cached:
             self.load_catalog()
 
@@ -101,7 +104,7 @@ class Crossmatcher:
 
         return self.id_matched
 
-    def coordinate_crossmatch(self, input_table, ra_key="ra", dec_key="dec", distance_key="sy_dist", radius_arcsec=15, radius_pc=0.02) -> Tuple[Table]:
+    def coordinate_crossmatch(self, input_table, ra_key="ra", dec_key="dec", distance_key="sy_dist") -> Tuple[Table]:
         if not self.catalogue_cached:
             self.load_catalog()
 
@@ -116,20 +119,19 @@ class Crossmatcher:
             distance=(self.catalogue["sy_dist"]*u.pc).to(u.pc)
         )
 
-        idx, sep2d, sep3d = coords_input.match_to_catalog_sky(coords_catalogue)
-        sep2d_mask = sep2d < radius_arcsec*u.arcsec
-        sep3d_mask = sep3d < radius_pc*u.pc
+        idx, sep2d, sep3d = coords_catalogue.match_to_catalog_sky(coords_input)
+        sep2d_mask = sep2d < self.search_radius_arcsec
+        sep3d_mask = sep3d < self.search_radius_pc
         self.coords3d_matched = astropy.table.hstack(
-            [input_table[sep3d_mask], self.catalogue[idx[sep3d_mask]], Table([["3d"]*sum(sep3d_mask)], names=["match_type"])],
+            [input_table[idx[sep3d_mask]], self.catalogue[sep3d_mask], Table([["3d"]*sum(sep3d_mask)], names=["match_type"])],
             table_names=[self.input_suffix, self.catalogue_suffix, "match_type"],
             join_type="exact"
         )
         self.coords3d_matched["3d_sep"] = sep3d[sep3d_mask]
         self.coords2d_matched = astropy.table.hstack(
-            [input_table[sep2d_mask], self.catalogue[idx[sep2d_mask]], Table([["2d"]*sum(sep2d_mask)], names=["match_type"])],
+            [input_table[idx[sep2d_mask]], self.catalogue[sep2d_mask], Table([["2d"]*sum(sep2d_mask)], names=["match_type"])],
             table_names=[self.input_suffix, self.catalogue_suffix, "match_type"],
             join_type="exact"
-
         )    
         self.coords2d_matched["2d_sep"] = sep2d[sep2d_mask]
         return (self.coords3d_matched, self.coords2d_matched)
