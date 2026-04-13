@@ -104,6 +104,61 @@ class Crossmatcher:
 
         return self.id_matched
 
+    def find_duplicates(self, input_table, full=False) -> Table:
+        if not self.alternate_ids_cached:
+            name_list = input_table[self.input_starname_key].tolist()
+            self.load_alternate_ids(name_list)
+
+        alt_ids_without_nulls = self.alternate_ids[~self.alternate_ids["id"].mask]
+            
+        self_joined = alt_ids_without_nulls.to_pandas().merge(
+            alt_ids_without_nulls.to_pandas(),
+            left_on="id",
+            right_on="id",
+            how="inner",
+            suffixes=("", "_linked")
+        )
+
+        grouped: pd.DataFrame = self_joined.groupby('input_ids')['input_ids_linked'].unique().reset_index()
+        grouped.rename(columns={"input_ids_linked": "duplicate_names"}, inplace=True)
+        grouped['duplicate_names'] = grouped['duplicate_names'].apply(lambda x: list(sorted(x))) # cast to python list
+        grouped['appearances'] = grouped['duplicate_names'].apply(len)
+        grouped = grouped[grouped['appearances'] > 1]
+        grouped = grouped.sort_values(by='duplicate_names').reset_index(drop=True)
+        if full: return Table.from_pandas(grouped)
+        
+        grouped = grouped.drop_duplicates(subset='duplicate_names')
+        return Table.from_pandas(grouped)
+    
+    def remove_duplicates(self, input_table) -> Table:
+        """
+        We keep the row with the highest number of non-null values
+        """
+        duplicates = self.find_duplicates(input_table)
+        drop_indices = []
+        for dupe in duplicates:
+            dupe_names = dupe["duplicate_names"]
+            print(dupe_names)
+            dupe_indeces = [np.argmax(input_table[self.input_starname_key] == name) for name in dupe_names]
+            null_counts = [
+                np.isin(list(input_table[idx]), ["", 'null', '0', 0]).sum() 
+                for idx in dupe_indeces
+            ]
+
+            input_table[dupe_indeces].pprint_all()
+            print(null_counts)
+
+            # we delete all but one of the duplicates, keeping the one with the least null values (but only one occurence)
+            first_minimum_of_null = np.argmin(null_counts == min(null_counts))
+            print(first_minimum_of_null)
+            drop_indices.extend(idx for i, idx in enumerate(dupe_indeces) if i != first_minimum_of_null)
+            print(drop_indices)
+            break
+
+        input_table.remove_rows(drop_indices)
+        # return input_table
+
+
     def coordinate_crossmatch(self, input_table, ra_key="ra", dec_key="dec", distance_key="sy_dist") -> Tuple[Table]:
         if not self.catalogue_cached:
             self.load_catalog()
