@@ -163,7 +163,9 @@ class Crossmatcher:
 
         print(f"Removed Rows with indecies and names: {', '.join(str(i) for i in drop_indices)}")
 
-        return input_table.copy().remove_rows(drop_indices)
+        copy = input_table.copy()
+        copy.remove_rows(drop_indices)
+        return copy
 
 
 
@@ -182,17 +184,18 @@ class Crossmatcher:
             distance=(self.catalogue["sy_dist"]*u.pc).to(u.pc)
         )
 
-        idx, sep2d, sep3d = coords_catalogue.match_to_catalog_sky(coords_input)
+        idx2d, sep2d, _ = coords_catalogue.match_to_catalog_sky(coords_input)
+        idx3d, _, sep3d = coords_catalogue.match_to_catalog_3d(coords_input)
         sep2d_mask = sep2d < self.search_radius_arcsec
         sep3d_mask = sep3d < self.search_radius_pc
         self.coords3d_matched = astropy.table.hstack(
-            [input_table[idx[sep3d_mask]], self.catalogue[sep3d_mask], Table([["3d"]*sum(sep3d_mask)], names=["match_type"])],
+            [input_table[idx3d[sep3d_mask]], self.catalogue[sep3d_mask], Table([["3d"]*sum(sep3d_mask)], names=["match_type"])],
             table_names=[self.input_suffix, self.catalogue_suffix, "match_type"],
             join_type="exact"
         )
         self.coords3d_matched["3d_sep"] = sep3d[sep3d_mask]
         self.coords2d_matched = astropy.table.hstack(
-            [input_table[idx[sep2d_mask]], self.catalogue[sep2d_mask], Table([["2d"]*sum(sep2d_mask)], names=["match_type"])],
+            [input_table[idx2d[sep2d_mask]], self.catalogue[sep2d_mask], Table([["2d"]*sum(sep2d_mask)], names=["match_type"])],
             table_names=[self.input_suffix, self.catalogue_suffix, "match_type"],
             join_type="exact"
         )    

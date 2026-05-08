@@ -9,3 +9,5 @@ provider
 pyarrow
 pandas
 scipy
+pytest
+pytest-mock
