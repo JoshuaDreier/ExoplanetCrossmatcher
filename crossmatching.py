@@ -189,16 +189,18 @@ class Crossmatcher:
         sep2d_mask = sep2d < self.search_radius_arcsec
         sep3d_mask = sep3d < self.search_radius_pc
         self.coords3d_matched = astropy.table.hstack(
-            [input_table[idx3d[sep3d_mask]], self.catalogue[sep3d_mask], Table([["3d"]*sum(sep3d_mask)], names=["match_type"])],
-            table_names=[self.input_suffix, self.catalogue_suffix, "match_type"],
+            [input_table[idx3d[sep3d_mask]], self.catalogue[sep3d_mask]],
+            table_names=[self.input_suffix, self.catalogue_suffix],
             join_type="exact"
         )
+        self.coords3d_matched["match_type"] = "3d"
         self.coords3d_matched["3d_sep"] = sep3d[sep3d_mask]
         self.coords2d_matched = astropy.table.hstack(
-            [input_table[idx2d[sep2d_mask]], self.catalogue[sep2d_mask], Table([["2d"]*sum(sep2d_mask)], names=["match_type"])],
-            table_names=[self.input_suffix, self.catalogue_suffix, "match_type"],
+            [input_table[idx2d[sep2d_mask]], self.catalogue[sep2d_mask]],
+            table_names=[self.input_suffix, self.catalogue_suffix],
             join_type="exact"
         )    
+        self.coords2d_matched["match_type"] = "2d"
         self.coords2d_matched["2d_sep"] = sep2d[sep2d_mask]
         return (self.coords3d_matched, self.coords2d_matched)
 
