@@ -98,11 +98,29 @@ class Crossmatcher:
             suffixes=(f"_{self.input_suffix}", f"_{self.catalogue_suffix}")
         )
 
-
         self.id_matched["match_type"] = "id"
         self.id_matched = astropy.table.Table.from_pandas(self.id_matched)
-                
 
+        # When the merge result is empty, Astropy can infer string columns as float64.
+        # Cast only actual string columns back to strings so vstack can merge correctly.
+        string_columns = {
+            name
+            for name in self.catalogue.colnames
+            if self.catalogue[name].dtype.kind in {"U", "S", "O"}
+        } | {
+            name
+            for name in self.alternate_ids.colnames
+            if self.alternate_ids[name].dtype.kind in {"U", "S", "O"}
+        } | {self.input_starname_key, "match_type"}
+        for colname in self.id_matched.colnames:
+            if colname in string_columns and self.id_matched[colname].dtype.kind in {"f", "i"}:
+                self.id_matched[colname] = self.id_matched[colname].astype("U")
+                self.id_matched[colname] = np.char.strip(self.id_matched[colname]) 
+                # we also strip whitespace in the process from any and all string columns
+                # TODO: think about how sensible this is
+
+
+        self.id_matched[self.input_starname_key] = self.id_matched[self.input_starname_key].astype(str)
         return self.id_matched
 
     def find_duplicates(self, input_table, full=False) -> Table:
@@ -228,9 +246,8 @@ class Crossmatcher:
             ~(np.isin(matched_list2d, matched_listid)
             | np.isin(matched_list2d, only_coords3d[uuid].tolist()))
         ]
-        
 
-        self.matched = astropy.table.vstack([self.id_matched, only_coords3d, only_coords2d], join_type="outer")     
+        self.matched = astropy.table.vstack([self.id_matched, only_coords3d, only_coords2d], join_type="outer")
         return self.matched
 
 
