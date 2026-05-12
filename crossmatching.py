@@ -36,7 +36,7 @@ class Crossmatcher:
         self.planet_uuid = "pl_name"
         self.input_starname_key = "star_name"
         self.catalogue_starname_key = "hostname"
-        self.search_radius_arcsec = 15*u.arcsec
+        self.search_radius_arcsec = 30*u.arcsec
         self.search_radius_pc = 0.005*u.pc # corresponds to around 82 arcsec at 10 pc 
     
     def load_catalog(self, from_file=None, format="ascii") -> Table:
@@ -54,7 +54,8 @@ class Crossmatcher:
 
     def load_alternate_ids(self, name_list, from_file=None, format="ascii") -> Table:
         if from_file is not None:
-            self.alternate_ids = Table.read(from_file, format=format)
+            alternate_ids_file = Table.read(from_file, format=format)
+            self.alternate_ids = alternate_ids_file[np.isin(alternate_ids_file["input_ids"], name_list)]
             self.alternate_ids_cached = True
             return self.alternate_ids
         simbad = pyvo.dal.TAPService("https://simbad.cds.unistra.fr/simbad/sim-tap")
