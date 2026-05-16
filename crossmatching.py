@@ -7,6 +7,113 @@ import pandas as pd
 from astropy.table import Table
 from astropy.coordinates import SkyCoord
 import astropy.units as u
+from astropy.table import Column
+import re
+
+
+def allowed_3d_seperation(angular_radius_2d, radial_velocity_km_s, dist_pc, epoch, hpic_epoch=2000, minimum=0.025):
+    """
+    Estimate the maximum 3D spatial displacement (pc) of a source since hpic_epoch.
+
+    angular_radius_2d: already-floored 2D angular threshold (astropy Quantity, arcsec)
+    radial_velocity_km_s: radial velocity in km/s (array OK; use 0 for unknown)
+    dist_pc: distance in parsecs (array OK)
+    epoch: estimated coordinate epoch (array OK)
+    minimum: floor in parsecs
+    """
+    dt = np.abs(epoch - hpic_epoch)
+    transverse_pc = angular_radius_2d.to(u.rad).value * dist_pc
+    km_s_per_pc_yr = (1 * u.km / u.s).to(u.pc / u.yr).value
+    radial_pc = np.abs(radial_velocity_km_s) * dt * km_s_per_pc_yr * 1.05
+    total_pc = np.sqrt(transverse_pc**2 + radial_pc**2)
+    return np.maximum(
+        total_pc*10, 
+        minimum) * u.pc
+
+
+def allowed_angular_seperation(proper_motion, epoch, hpic_epoch=2000, minimum=50):
+    """inputs must be in arcsec"""
+    return np.maximum(
+        proper_motion*np.abs(epoch - hpic_epoch) * 1.05,
+        minimum
+    )*u.arcsec
+
+
+
+def extract_year_from_reflink(reflink):
+    """Parse a publication year from an ADS-style HTML reflink string."""
+    if not reflink or np.ma.is_masked(reflink):
+        return None
+
+    # Try the structured refstr attribute first: e.g. STASSUN_ET_AL__2019
+    match = re.search(r'refstr=["\']?[A-Z_]+_(\d{4})', reflink)
+    if match:
+        return int(match.group(1))
+
+    # Fallback: any 4-digit year anywhere in the string
+    match = re.search(r'\b(19|20)\d{2}\b', reflink)
+    if match:
+        return int(match.group(0))
+
+    return None
+
+
+def add_coord_epoch_column(table, col_name='coord_epoch'):
+    """
+    Estimate the epoch of the sky coordinates for each row and add it
+    as a new column to the table.
+
+    Priority:
+      1. Gaia DR3 id present  -> 2016.0
+      2. Gaia DR2 id present  -> 2016.0
+      3. ra_reflink mentions TICv8/Stassun -> 2000.0
+      4. ra_reflink mentions Hipparcos     -> 1991.25
+      5. ra_reflink publication year >= 2018 (post-Gaia DR2) -> 2016.0
+      6. ra_reflink publication year < 2018  -> that year (rough proxy)
+      7. Default -> 2000.0
+    """
+    n = len(table)
+    epochs = np.full(n, 2000.0)  # default
+
+    # Work column-by-column — faster than row-by-row per astropy docs
+    gaia_dr3 = table['gaia_dr3_id']
+    gaia_dr2 = table['gaia_dr2_id']
+    reflinks = table['ra_reflink']
+
+    for i in range(n):
+        dr3 = gaia_dr3[i]
+        dr2 = gaia_dr2[i]
+        reflink = reflinks[i]
+
+        # 1 & 2: Gaia ID is the most reliable epoch indicator
+        if not np.ma.is_masked(dr3) and str(dr3).strip() not in ('', '--', '0'):
+            epochs[i] = 2016.0
+            continue
+        if not np.ma.is_masked(dr2) and str(dr2).strip() not in ('', '--', '0'):
+            epochs[i] = 2016.0
+            continue
+
+        # 3–6: parse the reflink
+        if np.ma.is_masked(reflink) or not reflink:
+            continue  # keep default 2000.0
+
+        reflink_upper = reflink.upper()
+
+        if any(k in reflink_upper for k in ('STASSUN', 'TICV', 'TIC_V')):
+            epochs[i] = 2000.0
+            continue
+
+        if any(k in reflink_upper for k in ('HIPPARCOS', '_HIP_', 'HIC_')):
+            epochs[i] = 1991.25
+            continue
+
+        pub_year = extract_year_from_reflink(reflink)
+        if pub_year is not None:
+            epochs[i] = 2016.0 if pub_year >= 2018 else float(pub_year)
+
+    table[col_name] = Column(epochs, name=col_name,
+                             description='Estimated epoch of sky coordinates (Julian year)')
+    return table
 
 
 class Crossmatcher:
@@ -36,8 +143,8 @@ class Crossmatcher:
         self.planet_uuid = "pl_name"
         self.input_starname_key = "star_name"
         self.catalogue_starname_key = "hostname"
-        self.search_radius_arcsec = 30*u.arcsec
-        self.search_radius_pc = 0.005*u.pc # corresponds to around 82 arcsec at 10 pc 
+        self.search_radius_arcsec = 50*u.arcsec
+        self.search_radius_pc = 0.05*u.pc # corresponds to around 160 arcsec at 10 pc 
     
     def load_catalog(self, from_file=None, format="ascii") -> Table:
         if from_file is not None:
@@ -66,11 +173,13 @@ class Crossmatcher:
         # takes around 1m30s
         input_ids = []
         all_ids = []
-        for input_id, alt_ids in alternate_ids_aggr.iterrows():
-            for id in str(alt_ids).split("|"):
-                input_ids.append(input_id)
+        # SIMBAD's `ids` column is a single pipe-delimited string of all alternate identifiers
+        # for an object (e.g. "Ross 128|GJ 447|HIP 57548|..."). We explode it here so each
+        # identifier gets its own row, which is what id_crossmatch needs for exact-string joining.
+        for row in alternate_ids_aggr:
+            for id in str(row["ids"]).split("|"):
+                input_ids.append(str(row["input_ids"]))
                 all_ids.append(id)
-                # all_ids.append(id.replace("'", "''")) # in ADQL, escape single quote ' with ''
 
         self.alternate_ids = Table([input_ids, all_ids], names=["input_ids", "id"], dtype=["str", "str"])
         self.alternate_ids_cached = True
@@ -83,13 +192,20 @@ class Crossmatcher:
         if not self.catalogue_cached:
             self.load_catalog()
 
-        catalogue_projected_onto_ids = \
-            self.catalogue.to_pandas().merge(
-                self.alternate_ids.to_pandas(),
-                left_on="hostname",
-                right_on="id",
-                how="inner"
-            )           
+        # Collapse runs of whitespace before joining. Catalogues don't agree on internal spacing:
+        # Example: SIMBAD stores "Ross  128" (two spaces) while NEA stores "Ross 128" (one space), so an
+        # exact-string join silently drops the match without this normalization.
+        cat_df = self.catalogue.to_pandas()
+        cat_df["hostname"] = cat_df["hostname"].str.split().str.join(" ")
+        alt_df = self.alternate_ids.to_pandas()
+        alt_df["id"] = alt_df["id"].str.split().str.join(" ")
+
+        catalogue_projected_onto_ids = cat_df.merge(
+            alt_df,
+            left_on="hostname",
+            right_on="id",
+            how="inner"
+        )
 
         self.id_matched = input_table.to_pandas().merge(
             catalogue_projected_onto_ids,
@@ -199,14 +315,27 @@ class Crossmatcher:
         )
         coords_catalogue = SkyCoord(
             ra=self.catalogue["ra"]*u.deg,
-            dec=self.catalogue["dec"]*u.deg, 
-            distance=(self.catalogue["sy_dist"]*u.pc).to(u.pc)
+            dec=self.catalogue["dec"]*u.deg,
+            distance=self.catalogue["sy_dist"]*u.pc
+        )
+
+        add_coord_epoch_column(self.catalogue)
+
+        per_row_radius_2d = allowed_angular_seperation(self.catalogue["sy_pm"].filled(0)/1000, self.catalogue["coord_epoch"])
+
+        per_row_radius_3d = allowed_3d_seperation(
+            per_row_radius_2d,
+            self.catalogue["st_radv"].filled(0),
+            self.catalogue["sy_dist"],
+            self.catalogue["coord_epoch"],
+            minimum=self.search_radius_pc.value
         )
 
         idx2d, sep2d, _ = coords_catalogue.match_to_catalog_sky(coords_input)
         idx3d, _, sep3d = coords_catalogue.match_to_catalog_3d(coords_input)
-        sep2d_mask = sep2d < self.search_radius_arcsec
-        sep3d_mask = sep3d < self.search_radius_pc
+        sep2d_mask = sep2d < per_row_radius_2d
+        sep3d_mask = sep3d < per_row_radius_3d
+        
         self.coords3d_matched = astropy.table.hstack(
             [input_table[idx3d[sep3d_mask]], self.catalogue[sep3d_mask]],
             table_names=[self.input_suffix, self.catalogue_suffix],
