@@ -1,0 +1,157 @@
+from astropy.table import Table, Column
+from crossmatching import Crossmatcher
+from tests.functional.conftest import make_catalog
+
+
+def _make_cm_id_only():
+    """Catalog star reachable by ID. coordinates are masked"""
+    cm = Crossmatcher()
+    cm.catalogue = make_catalog({
+        "hostname": "ID Star", 
+        "pl_name": "ID Star b",
+    },)
+    cm.catalogue_cached = True
+    cm.alternate_ids = Table({
+        "input_ids": ["id-only-input"],
+        "id":        ["ID Star"],
+    })
+    cm.alternate_ids_cached = True
+    return cm
+
+
+def _make_cm_coord_only():
+    """Catalog star with no alternate ID and just coordinates"""
+    cm = Crossmatcher()
+    cm.catalogue = make_catalog({
+        "hostname": "Coord Star",
+        "pl_name": "Coord Star b", 
+        "ra": 100.0, 
+        "dec": 20.0, 
+        "sy_dist": 10.0
+    },)
+    cm.catalogue_cached = True
+    cm.alternate_ids = Table({
+        "input_ids": Column([], dtype="U64"),
+        "id":        Column([], dtype="U64"),
+    })
+    cm.alternate_ids_cached = True
+    return cm
+
+
+def test_combined_finds_id_match():
+    cm = _make_cm_id_only()
+    input_table = Table({
+        "star_name": ["id-only-input"],
+        "ra":        [0.0],
+        "dec":       [0.0],
+        "sy_dist":   [1.0],
+    })
+    result = cm.combined_crossmatch(input_table)
+    planets = result["pl_name"].tolist()
+    match_types = result["match_type"].tolist()
+    assert "ID Star b" in planets
+    assert match_types[planets.index("ID Star b")] == "id"
+
+
+def test_combined_finds_coord_match():
+    cm = _make_cm_coord_only()
+    input_table = Table({
+        "star_name": ["coord-only-input"],
+        "ra":        [100.0],
+        "dec":       [ 20.0],
+        "sy_dist":   [ 10.0],
+    })
+    result = cm.combined_crossmatch(input_table)
+    planets = result["pl_name"].tolist()
+    assert "Coord Star b" in planets
+    match_types = result["match_type"].tolist()
+    assert match_types[planets.index("Coord Star b")] in {"2d", "3d"}
+
+
+def test_combined_deduplicates():
+    """A star matched by both ID and coordinates should appear exactly once."""
+    cm = Crossmatcher()
+    cm.catalogue = make_catalog({
+        "hostname": "Both Star", 
+        "pl_name": "Both Star b", 
+        "ra": 100.0, 
+        "dec": 20.0, 
+        "sy_dist": 10.0
+    },)
+    cm.catalogue_cached = True
+    cm.alternate_ids = Table({
+        "input_ids": ["both-match-input"],
+        "id":        ["Both Star"],
+    })
+    cm.alternate_ids_cached = True
+    input_table = Table({
+        "star_name": ["both-match-input"],
+        "ra":        [100.0],
+        "dec":       [ 20.0],
+        "sy_dist":   [ 10.0],
+    })
+    result = cm.combined_crossmatch(input_table)
+    assert result["pl_name"].tolist().count("Both Star b") == 1
+
+def test_combined_id_match_favored_over_coord_match():
+    """If a star is matched by both ID and coordinates, the match_type should be 'id'."""
+    cm = Crossmatcher()
+    cm.catalogue = make_catalog({
+        "hostname": "Both Star", 
+        "pl_name": "Both Star b", 
+        "ra": 100.0, 
+        "dec": 20.0, 
+        "sy_dist": 10.0
+    },)
+    cm.catalogue_cached = True
+    cm.alternate_ids = Table({
+        "input_ids": ["both-match-input"],
+        "id":        ["Both Star"],
+    })
+    cm.alternate_ids_cached = True
+    input_table = Table({
+        "star_name": ["both-match-input"],
+        "ra":        [100.0],
+        "dec":       [ 20.0],
+        "sy_dist":   [ 10.0],
+    })
+    result = cm.combined_crossmatch(input_table)
+    assert result["match_type"][result["star_name"] == "both-match-input"] == ["id"]
+
+
+def test_combined_one_id_one_3d_one_2d():
+    """Three input stars each matched by a different method.
+    id-star:  ID match only (input coords are far from catalog).
+    3d-star:  3D match only (exact position and distance, no alternate ID).
+    2d-star:  2D match only (same sky position but wrong distance, no alternate ID)."""
+    cm = Crossmatcher()
+    cm.catalogue = make_catalog(
+        {"hostname": "ID Star", "pl_name": "ID Star b", "ra":  10.0, "dec": 10.0, "sy_dist": 10.0},
+        {"hostname": "3D Star",  "pl_name": "3D Star b",  "ra": 100.0, "dec": 20.0, "sy_dist": 20.0},
+        {"hostname": "2D Star", "pl_name": "2D Star b", "ra": 200.0, "dec": 40.0, "sy_dist": 30.0},
+    )
+    cm.catalogue_cached = True
+    cm.alternate_ids = Table({
+        "input_ids": ["id-star"],
+        "id":        ["ID Star"],
+    })
+    cm.alternate_ids_cached = True
+    input_table = Table({
+        "star_name": ["id-star", "3d-star", "2d-star"],
+        "ra":        [  0.0,      100.0,     200.0],
+        "dec":       [  0.0,       20.0,      40.0],
+        "sy_dist":   [  1.0,      20.0,       15.0],
+    })
+    result = cm.combined_crossmatch(input_table)
+
+    matched = {row["star_name"]: row["pl_name"] for row in result}
+    assert matched["id-star"] == "ID Star b"
+    assert matched["3d-star"] == "3D Star b"
+    assert matched["2d-star"] == "2D Star b"
+
+    match_type = {row["star_name"]: row["match_type"] for row in result}
+    assert match_type["id-star"] == "id"
+    assert match_type["3d-star"] == "3d"
+    assert match_type["2d-star"] == "2d"
+
+

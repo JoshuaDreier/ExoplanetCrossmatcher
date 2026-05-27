@@ -3,8 +3,6 @@ from astropy.table import Table
 import pytest
 
 def id_crossmatch(crossmatcher: Crossmatcher, query_row):
-    # print("$$$", type(query_row))
-    # print("$$$", query_row["star_name"])
     crossmatcher.load_alternate_ids(query_row["star_name"].tolist(), from_file="alternate_ids.txt")
     return crossmatcher.id_crossmatch(query_row)
 

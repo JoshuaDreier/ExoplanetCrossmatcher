@@ -11,32 +11,38 @@ from astropy.table import Column
 import re
 
 
-def allowed_3d_seperation(angular_radius_2d, radial_velocity_km_s, dist_pc, epoch, hpic_epoch=2000, minimum=0.025):
+def allowed_3d_seperation(angular_radius_2d, radial_velocity, dist_pc, mean_dist_err, gaia_mag, epoch, hpic_epoch=2000, minimum=0.001*u.pc):
     """
     Estimate the maximum 3D spatial displacement (pc) of a source since hpic_epoch.
 
-    angular_radius_2d: already-floored 2D angular threshold (astropy Quantity, arcsec)
-    radial_velocity_km_s: radial velocity in km/s (array OK; use 0 for unknown)
-    dist_pc: distance in parsecs (array OK)
-    epoch: estimated coordinate epoch (array OK)
-    minimum: floor in parsecs
+    angular_radius_2d: already-floored 2D threshold (astropy Quantity, arcsec)
+    radial_velocity:   radial velocity in km/s (array OK; use 0 for unknown)
+    dist_pc:           distance in parsecs (array OK)
+    mean_dist_err:     mean distance uncertainty in parsecs (array OK; use 0 for unknown)
+    gaia_mag:          Gaia G-band magnitude (array OK; use np.inf for unknown/dim stars)
+    epoch:             estimated coordinate epoch (array OK)
+    minimum:           floor (astropy Quantity with pc unit)
     """
+    dt = np.abs(epoch - hpic_epoch) * u.yr
+    transverse = angular_radius_2d.to(u.rad).value * dist_pc * u.pc
+    radial = (np.abs(radial_velocity) * u.km / u.s * dt).to(u.pc)
+    dist_unc = mean_dist_err * u.pc
+    # Gaia DR2 parallax systematic for stars with G < 5 (saturation/calibration bias).
+    # δd = δπ × d²/1000 with δπ ≈ 2 mas 
+    # gaia_bias = np.where(
+    #     gaia_mag < 5,
+    #     2*1e-3*dist_pc**2,
+    #     0.0
+    # ) * u.pc
+    gaia_bias = 0
+    total = np.sqrt(transverse**2 + radial**2 + dist_unc**2) + gaia_bias
+    return total + minimum
+
+
+def allowed_angular_seperation(proper_motion, pm_err, epoch, hpic_epoch=2000, minimum=10*u.arcsec):
+    """inputs must be in arcsec/yr"""
     dt = np.abs(epoch - hpic_epoch)
-    transverse_pc = angular_radius_2d.to(u.rad).value * dist_pc
-    km_s_per_pc_yr = (1 * u.km / u.s).to(u.pc / u.yr).value
-    radial_pc = np.abs(radial_velocity_km_s) * dt * km_s_per_pc_yr * 1.05
-    total_pc = np.sqrt(transverse_pc**2 + radial_pc**2)
-    return np.maximum(
-        total_pc*10, 
-        minimum) * u.pc
-
-
-def allowed_angular_seperation(proper_motion, epoch, hpic_epoch=2000, minimum=50):
-    """inputs must be in arcsec"""
-    return np.maximum(
-        proper_motion*np.abs(epoch - hpic_epoch) * 1.05,
-        minimum
-    )*u.arcsec
+    return ((proper_motion + pm_err) * dt)*u.arcsec + minimum
 
 
 
@@ -143,9 +149,9 @@ class Crossmatcher:
         self.planet_uuid = "pl_name"
         self.input_starname_key = "star_name"
         self.catalogue_starname_key = "hostname"
-        self.search_radius_arcsec = 50*u.arcsec
-        self.search_radius_pc = 0.05*u.pc # corresponds to around 160 arcsec at 10 pc 
-    
+        self.search_radius_arcsec = 10*u.arcsec
+        # self.search_radius_pc = 0.05 * u.pc # corresponds to around 160 arcsec at 10 pc 
+        self.search_radius_pc = 0.001*u.pc
     def load_catalog(self, from_file=None, format="ascii") -> Table:
         if from_file is not None:
             self.catalogue = Table.read(from_file, format=format)
@@ -285,12 +291,12 @@ class Crossmatcher:
             # extract the indices of the duplicate rows
             dupe_indeces = np.where(dupes_index_comparison_array)[1]
             null_counts = [
-                np.isin(list(input_table[idx]), ["", 'null', '0', 0]).sum() 
+                np.isin(list(input_table[idx]), ["", 'null', '0', 0, None]).sum() 
                 for idx in dupe_indeces
             ]
     
             # we delete all but one of the duplicates, keeping the one with the least null values (but only one occurence)
-            first_minimum_of_null = np.argmin(null_counts == min(null_counts))
+            first_minimum_of_null = np.argmax(null_counts == min(null_counts))
 
             #TODO: decide what to do if there are multiple rows with the same number of null values
 
@@ -308,46 +314,65 @@ class Crossmatcher:
         if not self.catalogue_cached:
             self.load_catalog()
 
-        coords_input = SkyCoord(
-            ra=input_table[ra_key]*u.deg,
-            dec=input_table[dec_key]*u.deg,
-            distance=input_table[distance_key]*u.pc
-        )
-        coords_catalogue = SkyCoord(
-            ra=self.catalogue["ra"]*u.deg,
-            dec=self.catalogue["dec"]*u.deg,
-            distance=self.catalogue["sy_dist"]*u.pc
-        )
-
         add_coord_epoch_column(self.catalogue)
 
-        per_row_radius_2d = allowed_angular_seperation(self.catalogue["sy_pm"].filled(0)/1000, self.catalogue["coord_epoch"])
-
-        per_row_radius_3d = allowed_3d_seperation(
-            per_row_radius_2d,
-            self.catalogue["st_radv"].filled(0),
-            self.catalogue["sy_dist"],
+        per_row_radius_2d = allowed_angular_seperation(
+            self.catalogue["sy_pm"].filled(0) / 1000,
+            self.catalogue["sy_pmerr1"].filled(0) / 1000,
             self.catalogue["coord_epoch"],
-            minimum=self.search_radius_pc.value
+            minimum=self.search_radius_arcsec
         )
+        mean_dist_err = (self.catalogue["sy_disterr1"] - self.catalogue["sy_disterr2"]).filled(0) / 2
 
-        idx2d, sep2d, _ = coords_catalogue.match_to_catalog_sky(coords_input)
-        idx3d, _, sep3d = coords_catalogue.match_to_catalog_3d(coords_input)
+        # 2D sky matching — distance irrelevant for angular separation
+        coords_input     = SkyCoord(ra=input_table[ra_key]*u.deg, dec=input_table[dec_key]*u.deg)
+        coords_catalogue = SkyCoord(ra=self.catalogue["ra"]*u.deg, dec=self.catalogue["dec"]*u.deg)
+        idx2d, sep2d, _  = coords_catalogue.match_to_catalog_sky(coords_input)
         sep2d_mask = sep2d < per_row_radius_2d
+
+        # 3D spatial matching — skip rows with zero or missing distance to avoid
+        # degenerate matches where both stars collapse to the 3D origin
+        has_distance_input = input_table[distance_key] > 0
+        has_distance_catalogue = self.catalogue["sy_dist"] > 0
+
+        input_3d = input_table[has_distance_input]
+        cat_3d = self.catalogue[has_distance_catalogue]
+        coords_input_3d = SkyCoord(
+            ra=input_3d[ra_key]*u.deg, dec=input_3d[dec_key]*u.deg,
+            distance=input_3d[distance_key]*u.pc,
+        )
+        coords_cat_3d = SkyCoord(
+            ra=cat_3d["ra"]*u.deg, dec=cat_3d["dec"]*u.deg,
+            distance=cat_3d["sy_dist"]*u.pc,
+        )
+        per_row_radius_3d = allowed_3d_seperation(
+            per_row_radius_2d[has_distance_catalogue],
+            cat_3d["st_radv"].filled(0),
+            cat_3d["sy_dist"],
+            mean_dist_err[has_distance_catalogue],
+            cat_3d["sy_gaiamag"].filled(np.inf),
+            cat_3d["coord_epoch"],
+            minimum=self.search_radius_pc
+        )
+        idx3d, _, sep3d = coords_cat_3d.match_to_catalog_3d(coords_input_3d)
         sep3d_mask = sep3d < per_row_radius_3d
-        
+
+        # idx3d indexes into input_3d; map back to original input_table row positions
+        input_valid_idx = np.where(has_distance_input)[0]
+
         self.coords3d_matched = astropy.table.hstack(
-            [input_table[idx3d[sep3d_mask]], self.catalogue[sep3d_mask]],
+            [input_table[input_valid_idx[idx3d[sep3d_mask]]], cat_3d[sep3d_mask]],
             table_names=[self.input_suffix, self.catalogue_suffix],
             join_type="exact"
         )
         self.coords3d_matched["match_type"] = "3d"
         self.coords3d_matched["3d_sep"] = sep3d[sep3d_mask]
+
         self.coords2d_matched = astropy.table.hstack(
             [input_table[idx2d[sep2d_mask]], self.catalogue[sep2d_mask]],
             table_names=[self.input_suffix, self.catalogue_suffix],
             join_type="exact"
-        )    
+        )
         self.coords2d_matched["match_type"] = "2d"
         self.coords2d_matched["2d_sep"] = sep2d[sep2d_mask]
         return (self.coords3d_matched, self.coords2d_matched)
