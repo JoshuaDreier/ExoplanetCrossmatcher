@@ -160,17 +160,21 @@ class Crossmatcher:
         id_str = id_str.strip()
         variants = [id_str]
 
-        # Strip SIMBAD variable/multiple star marker (*) which appears in ~4800 IDs
-        stripped = id_str.lstrip('*')
-        if stripped and stripped != id_str:
-            variants.append(stripped.lstrip())
-
-        if "'s" in id_str:
-            variants.append(id_str.replace("'s", ""))
-        if 'NAME' in id_str:
-            variants.append(id_str.replace("NAME ", ""))
+        if id_str.startswith('*'):
+            # Strip SIMBAD object type prefix: * = Star, ** = Star in double system (binary)
+            # Per SIMBAD nomenclature, these prefixes appear in ~4800 IDs but NEA catalog doesn't use them
+            variants.append(id_str.lstrip('*'))
+        if id_str.endswith("'s"):
+            # SIMBAD sometimes includes possessive forms of star names (Barnard's), but not the non-possessive form
+            # we include the non-possessive form, because NEA uses it (Barnard b) 
+            variants.append(id_str.rstrip("'s"))
+        if id_str.startswith("NAME "):
+            # SIMBAD sometimes includes "NAME " in front of star names (e.g. NAME Proxima Cen)
+            # we include both versions
+            variants.append(id_str.lstrip("NAME "))
 
         return [(input_id, v) for v in variants]
+
 
     def load_alternate_ids(self, name_list, from_file=None, format="ascii") -> Table:
         if from_file is not None:
