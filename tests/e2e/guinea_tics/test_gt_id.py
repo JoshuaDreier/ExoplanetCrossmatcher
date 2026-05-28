@@ -9,7 +9,7 @@ gt_ids, gt_row_params = get_guinea_tics_table_parametrization()
 @pytest.mark.parametrize(
     "star_name,ra,dec,sy_dist,expected_planets",
     gt_row_params,
-    ids=[f"id-{gt_id}-af-xfail" for gt_id in gt_ids],
+    ids=[f"id-af-xfail-{gt_id}" for gt_id in gt_ids],
 )
 def test_e2e_guinea_tics_id_all_found(stateless_matcher, star_name, ra, dec, sy_dist, expected_planets):
     _e2e_all_planets_found(star_name, ra, dec, sy_dist, expected_planets, stateless_matcher, id_crossmatch)    
@@ -18,7 +18,7 @@ def test_e2e_guinea_tics_id_all_found(stateless_matcher, star_name, ra, dec, sy_
 @pytest.mark.parametrize(
     "star_name,ra,dec,sy_dist,expected_planets",
     gt_row_params,
-    ids=[f"id-{gt_id}-fp-xfail" for gt_id in gt_ids],
+    ids=[f"id-fp-xfail-{gt_id}" for gt_id in gt_ids],
 )
 def test_e2e_guinea_tics_id_no_false_positives(stateless_matcher, star_name, ra, dec, sy_dist, expected_planets):
     _e2e_no_false_positives(star_name, ra, dec, sy_dist, expected_planets, stateless_matcher, id_crossmatch)    

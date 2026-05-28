@@ -8,7 +8,7 @@ gt_ids, gt_row_params = get_guinea_tics_table_parametrization()
 @pytest.mark.parametrize(
     "star_name,ra,dec,sy_dist,expected_planets",
     gt_row_params,
-    ids=[f"combined-a-{gt_id}" for gt_id in gt_ids],
+    ids=[f"combined-af-{gt_id}" for gt_id in gt_ids],
 )
 def test_e2e_guinea_tics_combined_all_found(stateless_matcher, star_name, ra, dec, sy_dist, expected_planets):
     _e2e_all_planets_found(star_name, ra, dec, sy_dist, expected_planets, stateless_matcher, combined_crossmatch)    
