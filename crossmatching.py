@@ -7,7 +7,7 @@ import pandas as pd
 from astropy.table import Table
 from astropy.coordinates import SkyCoord
 import astropy.units as u
-from astropy.table import Column
+from astropy.table import Column, MaskedColumn
 import re
 
 
@@ -39,11 +39,27 @@ def allowed_3d_seperation(angular_radius_2d, radial_velocity, dist_pc, mean_dist
     return total + minimum
 
 
-def allowed_angular_seperation(proper_motion, pm_err, epoch, hpic_epoch=2000, minimum=10*u.arcsec):
-    """inputs must be in arcsec/yr"""
-    dt = np.abs(epoch - hpic_epoch)
-    return ((proper_motion + pm_err) * dt)*u.arcsec + minimum
+def allowed_angular_seperation(proper_motion, pm_err, epoch, hpic_epoch=2000,
+                               minimum=10*u.arcsec, unknown_default=50*u.arcsec):
+    """
+    inputs must be in arcsec/yr. epoch and proper_motion may be masked arrays.
+    Rows where epoch or proper_motion is masked (unknown) get unknown_default
+    instead of the computed value.
+    """
+    epoch_arr = np.ma.asarray(epoch)
+    pm_arr = np.ma.asarray(proper_motion)
+    unknown = np.ma.getmaskarray(epoch_arr) | np.ma.getmaskarray(pm_arr)
 
+    dt = np.abs(np.ma.filled(epoch_arr, hpic_epoch) - hpic_epoch)
+    pm = np.ma.filled(pm_arr, 0.0)
+    pmerr = np.ma.filled(np.ma.asarray(pm_err), 0.0)
+
+    computed = (pm + pmerr) * dt * u.arcsec + minimum
+    return np.where(
+        unknown,
+        unknown_default.to(u.arcsec).value,
+        computed.to(u.arcsec).value
+    ) * u.arcsec
 
 
 def extract_year_from_reflink(reflink):
@@ -64,10 +80,10 @@ def extract_year_from_reflink(reflink):
     return None
 
 
-def add_coord_epoch_column(table, col_name='coord_epoch'):
+def coord_epoch(reflink, gaia_dr3, gaia_dr2):
     """
-    Estimate the epoch of the sky coordinates for each row and add it
-    as a new column to the table.
+    Estimate the coordinate epoch for a single catalogue row.
+    Returns a float (Julian year) or None if the epoch cannot be determined.
 
     Priority:
       1. Gaia DR3 id present  -> 2016.0
@@ -76,50 +92,24 @@ def add_coord_epoch_column(table, col_name='coord_epoch'):
       4. ra_reflink mentions Hipparcos     -> 1991.25
       5. ra_reflink publication year >= 2018 (post-Gaia DR2) -> 2016.0
       6. ra_reflink publication year < 2018  -> that year (rough proxy)
-      7. Default -> 2000.0
+      7. Default -> None (unknown; allowed_angular_seperation will use unknown_default)
     """
-    n = len(table)
-    epochs = np.full(n, 2000.0)  # default
+    if not np.ma.is_masked(gaia_dr3) and str(gaia_dr3).strip() not in ('', '--', '0'):
+        return 2016.0
+    if not np.ma.is_masked(gaia_dr2) and str(gaia_dr2).strip() not in ('', '--', '0'):
+        return 2016.0
+    if np.ma.is_masked(reflink) or not reflink:
+        return None
+    reflink_upper = reflink.upper()
+    if any(k in reflink_upper for k in ('STASSUN', 'TICV', 'TIC_V')):
+        return 2000.0
+    if any(k in reflink_upper for k in ('HIPPARCOS', '_HIP_', 'HIC_')):
+        return 1991.25
+    pub_year = extract_year_from_reflink(reflink)
+    if pub_year is not None:
+        return 2016.0 if pub_year >= 2018 else float(pub_year)
+    return None
 
-    # Work column-by-column — faster than row-by-row per astropy docs
-    gaia_dr3 = table['gaia_dr3_id']
-    gaia_dr2 = table['gaia_dr2_id']
-    reflinks = table['ra_reflink']
-
-    for i in range(n):
-        dr3 = gaia_dr3[i]
-        dr2 = gaia_dr2[i]
-        reflink = reflinks[i]
-
-        # 1 & 2: Gaia ID is the most reliable epoch indicator
-        if not np.ma.is_masked(dr3) and str(dr3).strip() not in ('', '--', '0'):
-            epochs[i] = 2016.0
-            continue
-        if not np.ma.is_masked(dr2) and str(dr2).strip() not in ('', '--', '0'):
-            epochs[i] = 2016.0
-            continue
-
-        # 3–6: parse the reflink
-        if np.ma.is_masked(reflink) or not reflink:
-            continue  # keep default 2000.0
-
-        reflink_upper = reflink.upper()
-
-        if any(k in reflink_upper for k in ('STASSUN', 'TICV', 'TIC_V')):
-            epochs[i] = 2000.0
-            continue
-
-        if any(k in reflink_upper for k in ('HIPPARCOS', '_HIP_', 'HIC_')):
-            epochs[i] = 1991.25
-            continue
-
-        pub_year = extract_year_from_reflink(reflink)
-        if pub_year is not None:
-            epochs[i] = 2016.0 if pub_year >= 2018 else float(pub_year)
-
-    table[col_name] = Column(epochs, name=col_name,
-                             description='Estimated epoch of sky coordinates (Julian year)')
-    return table
 
 
 class Crossmatcher:
@@ -314,11 +304,18 @@ class Crossmatcher:
         if not self.catalogue_cached:
             self.load_catalog()
 
-        add_coord_epoch_column(self.catalogue)
+        epochs = [coord_epoch(rl, dr3, dr2) for rl, dr3, dr2 in 
+                  zip(self.catalogue['ra_reflink'], self.catalogue['gaia_dr3_id'], self.catalogue['gaia_dr2_id'])]
+        
+        self.catalogue['coord_epoch'] = MaskedColumn(
+            np.ma.MaskedArray([e if e is not None else 0.0 for e in epochs],
+                              mask=[e is None for e in epochs]),
+            name='coord_epoch',
+            description='Estimated epoch of sky coordinates (Julian year)')
 
         per_row_radius_2d = allowed_angular_seperation(
-            self.catalogue["sy_pm"].filled(0) / 1000,
-            self.catalogue["sy_pmerr1"].filled(0) / 1000,
+            self.catalogue["sy_pm"] / 1000,
+            self.catalogue["sy_pmerr1"] / 1000,
             self.catalogue["coord_epoch"],
             minimum=self.search_radius_arcsec
         )
