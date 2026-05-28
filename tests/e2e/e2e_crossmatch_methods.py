@@ -1,5 +1,4 @@
 from crossmatching import Crossmatcher
-from astropy.table import Table
 import pytest
 
 def id_crossmatch(crossmatcher: Crossmatcher, query_row):
@@ -25,10 +24,7 @@ def loaded_matcher():
 
 @pytest.fixture(scope="function")
 def stateless_matcher(loaded_matcher):
-    cm = loaded_matcher
+    cm = Crossmatcher()
+    cm.catalogue = loaded_matcher.catalogue  # reference, not a reload
+    cm.catalogue_cached = True
     yield cm
-    cm.alternate_ids = Table()
-    cm.alternate_ids_cached = False
-    cm.id_matched = Table()
-    cm.coords3d_matched = Table()
-    cm.coords2d_matched = Table()
