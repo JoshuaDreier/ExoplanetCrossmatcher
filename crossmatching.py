@@ -155,27 +155,57 @@ class Crossmatcher:
         self.catalogue_cached = True
         return self.catalogue
 
+    def _expand_id_with_variants(self, input_id, id_str):
+        """Expand an ID with possessive, NAME, and SIMBAD prefix variants."""
+        id_str = id_str.strip()
+        variants = [id_str]
+
+        # Strip SIMBAD variable/multiple star marker (*) which appears in ~4800 IDs
+        stripped = id_str.lstrip('*')
+        if stripped and stripped != id_str:
+            variants.append(stripped.lstrip())
+
+        if "'s" in id_str:
+            variants.append(id_str.replace("'s", ""))
+        if 'NAME' in id_str:
+            variants.append(id_str.replace("NAME ", ""))
+
+        return [(input_id, v) for v in variants]
+
     def load_alternate_ids(self, name_list, from_file=None, format="ascii") -> Table:
         if from_file is not None:
             alternate_ids_file = Table.read(from_file, format=format)
-            self.alternate_ids = alternate_ids_file[np.isin(alternate_ids_file["input_ids"], name_list)]
+            filtered = alternate_ids_file[np.isin(alternate_ids_file["input_ids"], name_list)]
+
+            input_ids = []
+            all_ids = []
+            for row in filtered:
+                input_id = str(row["input_ids"])
+                id_str = str(row["id"])
+                for _, variant_id in self._expand_id_with_variants(input_id, id_str):
+                    input_ids.append(input_id)
+                    all_ids.append(variant_id)
+
+            self.alternate_ids = Table([input_ids, all_ids], names=["input_ids", "id"], dtype=["str", "str"])
             self.alternate_ids_cached = True
             return self.alternate_ids
+
         simbad = pyvo.dal.TAPService("https://simbad.cds.unistra.fr/simbad/sim-tap")
         alternate_ids_aggr = simbad.run_sync(
             "SELECT input_ids, ids FROM input_ids LEFT JOIN ident ON input_ids.input_ids = ident.id LEFT JOIN ids USING(oidref)",
         uploads={"input_ids": Table({"input_ids": name_list})}
         ).to_table()
-        # takes around 1m30s
-        input_ids = []
-        all_ids = []
         # SIMBAD's `ids` column is a single pipe-delimited string of all alternate identifiers
         # for an object (e.g. "Ross 128|GJ 447|HIP 57548|..."). We explode it here so each
         # identifier gets its own row, which is what id_crossmatch needs for exact-string joining.
+        input_ids = []
+        all_ids = []
         for row in alternate_ids_aggr:
-            for id in str(row["ids"]).split("|"):
-                input_ids.append(str(row["input_ids"]))
-                all_ids.append(id)
+            input_id = str(row["input_ids"])
+            for id_str in str(row["ids"]).split("|"):
+                for _, variant_id in self._expand_id_with_variants(input_id, id_str):
+                    input_ids.append(input_id)
+                    all_ids.append(variant_id)
 
         self.alternate_ids = Table([input_ids, all_ids], names=["input_ids", "id"], dtype=["str", "str"])
         self.alternate_ids_cached = True
