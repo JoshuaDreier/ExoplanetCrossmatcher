@@ -160,9 +160,11 @@ class Crossmatcher:
         id_str = id_str.strip()
         variants = [id_str]
 
-        if id_str.startswith('*'):
+        if id_str.startswith('**'):
             # Strip SIMBAD object type prefix: * = Star, ** = Star in double system (binary)
             # Per SIMBAD nomenclature, these prefixes appear in ~4800 IDs but NEA catalog doesn't use them
+            variants.append(id_str.lstrip('**'))
+        elif id_str.startswith('*'):
             variants.append(id_str.lstrip('*'))
         if id_str.endswith("'s"):
             # SIMBAD sometimes includes possessive forms of star names (Barnard's), but not the non-possessive form
