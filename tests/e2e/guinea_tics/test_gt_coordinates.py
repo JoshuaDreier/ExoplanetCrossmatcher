@@ -9,7 +9,7 @@ gt_ids, gt_row_params = get_guinea_tics_table_parametrization()
 @pytest.mark.parametrize(
     "star_name,ra,dec,sy_dist,expected_planets",
     gt_row_params,
-        ids=[f"2d-{gt_id}-af-xfail" for gt_id in gt_ids],
+        ids=[f"2d-af-xfail-{gt_id}" for gt_id in gt_ids],
 )
 def test_e2e_guinea_tics_coorinates_2d_all_found(stateless_matcher, star_name, ra, dec, sy_dist, expected_planets):
     _e2e_all_planets_found(star_name, ra, dec, sy_dist, expected_planets, stateless_matcher, coordinate_crossmatch_2d)    
@@ -18,7 +18,7 @@ def test_e2e_guinea_tics_coorinates_2d_all_found(stateless_matcher, star_name, r
 @pytest.mark.parametrize(
     "star_name,ra,dec,sy_dist,expected_planets",
     gt_row_params,
-    ids=[f"2d-{gt_id}-fp-xfail" for gt_id in gt_ids],
+    ids=[f"2d-fp-xfail-{gt_id}" for gt_id in gt_ids],
 )
 def test_e2e_guinea_tics_coordinates_2d_no_false_positives(stateless_matcher, star_name, ra, dec, sy_dist, expected_planets):
     _e2e_no_false_positives(star_name, ra, dec, sy_dist, expected_planets, stateless_matcher, coordinate_crossmatch_2d)    
@@ -28,7 +28,7 @@ def test_e2e_guinea_tics_coordinates_2d_no_false_positives(stateless_matcher, st
 @pytest.mark.parametrize(
     "star_name,ra,dec,sy_dist,expected_planets",
     gt_row_params,
-    ids=[f"3d-{gt_id}-af-xfail" for gt_id in gt_ids],
+    ids=[f"3d-af-xfail-{gt_id}" for gt_id in gt_ids],
 )
 def test_e2e_guinea_tics_coordinates_3d_all_found(stateless_matcher, star_name, ra, dec, sy_dist, expected_planets):
     _e2e_all_planets_found(star_name, ra, dec, sy_dist, expected_planets, stateless_matcher, coordinate_crossmatch_3d)    
@@ -37,7 +37,7 @@ def test_e2e_guinea_tics_coordinates_3d_all_found(stateless_matcher, star_name, 
 @pytest.mark.parametrize(
     "star_name,ra,dec,sy_dist,expected_planets",
     gt_row_params,
-    ids=[f"3d-{gt_id}-fp-xfail" for gt_id in gt_ids],
+    ids=[f"3d-fp-xfail-{gt_id}" for gt_id in gt_ids],
 )
 def test_e2e_guinea_tics_coordinates_3d_no_false_positives(stateless_matcher, star_name, ra, dec, sy_dist, expected_planets):
     _e2e_no_false_positives(star_name, ra, dec, sy_dist, expected_planets, stateless_matcher, coordinate_crossmatch_3d)    

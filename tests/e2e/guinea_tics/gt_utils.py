@@ -8,5 +8,5 @@ def get_guinea_tics_table_parametrization():
         expected_planets = [p for p in row["expected_planets"].split("|")]
         gt_row_params.append((row["star_name"], row["ra"], row["dec"], row["sy_dist"], expected_planets))
 
-    gt_ids = table["star_name"].tolist()
+    gt_ids = table["hostname"].tolist()
     return gt_ids, gt_row_params
