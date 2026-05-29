@@ -7,18 +7,18 @@ gt_ids, gt_row_params = get_guinea_tics_table_parametrization()
 
 @pytest.mark.xfail(strict=False, reason="some stars only reachable via combined method")
 @pytest.mark.parametrize(
-    "star_name,ra,dec,sy_dist,expected_planets",
+    "star_name,ra,dec,expected_planets",
     gt_row_params,
     ids=[f"id-af-xfail-{gt_id}" for gt_id in gt_ids],
 )
-def test_e2e_guinea_tics_id_all_found(stateless_matcher, star_name, ra, dec, sy_dist, expected_planets):
-    _e2e_all_planets_found(star_name, ra, dec, sy_dist, expected_planets, stateless_matcher, id_crossmatch)    
+def test_e2e_guinea_tics_id_all_found(stateless_matcher, star_name, ra, dec, expected_planets):
+    _e2e_all_planets_found(star_name, ra, dec, expected_planets, stateless_matcher, id_crossmatch)
 
 @pytest.mark.xfail(strict=False, reason="some stars only reachable via combined method")
 @pytest.mark.parametrize(
-    "star_name,ra,dec,sy_dist,expected_planets",
+    "star_name,ra,dec,expected_planets",
     gt_row_params,
     ids=[f"id-fp-xfail-{gt_id}" for gt_id in gt_ids],
 )
-def test_e2e_guinea_tics_id_no_false_positives(stateless_matcher, star_name, ra, dec, sy_dist, expected_planets):
-    _e2e_no_false_positives(star_name, ra, dec, sy_dist, expected_planets, stateless_matcher, id_crossmatch)    
+def test_e2e_guinea_tics_id_no_false_positives(stateless_matcher, star_name, ra, dec, expected_planets):
+    _e2e_no_false_positives(star_name, ra, dec, expected_planets, stateless_matcher, id_crossmatch)

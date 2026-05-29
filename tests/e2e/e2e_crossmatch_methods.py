@@ -5,11 +5,8 @@ def id_crossmatch(crossmatcher: Crossmatcher, query_row):
     crossmatcher.load_alternate_ids(query_row["star_name"].tolist(), from_file="alternate_ids.txt")
     return crossmatcher.id_crossmatch(query_row)
 
-def coordinate_crossmatch_3d(crossmatcher: Crossmatcher, query_row):
-    return crossmatcher.coordinate_crossmatch(query_row)[0]
-
-def coordinate_crossmatch_2d(crossmatcher: Crossmatcher, query_row):
-    return crossmatcher.coordinate_crossmatch(query_row)[1]
+def coordinate_crossmatch(crossmatcher: Crossmatcher, query_row):
+    return crossmatcher.coordinate_crossmatch(query_row)
 
 def combined_crossmatch(crossmatcher: Crossmatcher, query_row):
     crossmatcher.load_alternate_ids(query_row["star_name"].tolist(), from_file="alternate_ids.txt")

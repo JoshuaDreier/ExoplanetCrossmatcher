@@ -1,5 +1,3 @@
-from typing import Tuple
-from unicodedata import name
 import astropy
 import numpy as np
 import pyvo
@@ -9,34 +7,6 @@ from astropy.coordinates import SkyCoord
 import astropy.units as u
 from astropy.table import Column, MaskedColumn
 import re
-
-
-def allowed_3d_seperation(angular_radius_2d, radial_velocity, dist_pc, mean_dist_err, gaia_mag, epoch, hpic_epoch=2000, minimum=0.001*u.pc):
-    """
-    Estimate the maximum 3D spatial displacement (pc) of a source since hpic_epoch.
-
-    angular_radius_2d: already-floored 2D threshold (astropy Quantity, arcsec)
-    radial_velocity:   radial velocity in km/s (array OK; use 0 for unknown)
-    dist_pc:           distance in parsecs (array OK)
-    mean_dist_err:     mean distance uncertainty in parsecs (array OK; use 0 for unknown)
-    gaia_mag:          Gaia G-band magnitude (array OK; use np.inf for unknown/dim stars)
-    epoch:             estimated coordinate epoch (array OK)
-    minimum:           floor (astropy Quantity with pc unit)
-    """
-    dt = np.abs(epoch - hpic_epoch) * u.yr
-    transverse = angular_radius_2d.to(u.rad).value * dist_pc * u.pc
-    radial = (np.abs(radial_velocity) * u.km / u.s * dt).to(u.pc)
-    dist_unc = mean_dist_err * u.pc
-    # Gaia DR2 parallax systematic for stars with G < 5 (saturation/calibration bias).
-    # δd = δπ × d²/1000 with δπ ≈ 2 mas 
-    # gaia_bias = np.where(
-    #     gaia_mag < 5,
-    #     2*1e-3*dist_pc**2,
-    #     0.0
-    # ) * u.pc
-    gaia_bias = 0
-    total = np.sqrt(transverse**2 + radial**2 + dist_unc**2) + gaia_bias
-    return total + minimum
 
 
 def allowed_angular_seperation(proper_motion, pm_err, epoch, hpic_epoch=2000,
@@ -131,17 +101,15 @@ class Crossmatcher:
         self.alternate_ids = Table()
         self.alternate_ids_cached = False
         self.id_matched = Table()
-        self.coords3d_matched = Table()
         self.coords2d_matched = Table()
-        self.matched = Table()  
+        self.matched = Table()
         self.catalogue_suffix = "cat"
         self.input_suffix = "input"
         self.planet_uuid = "pl_name"
         self.input_starname_key = "star_name"
         self.catalogue_starname_key = "hostname"
         self.search_radius_arcsec = 10*u.arcsec
-        # self.search_radius_pc = 0.05 * u.pc # corresponds to around 160 arcsec at 10 pc 
-        self.search_radius_pc = 0.001*u.pc
+
     def load_catalog(self, from_file=None, format="ascii") -> Table:
         if from_file is not None:
             self.catalogue = Table.read(from_file, format=format)
@@ -155,7 +123,7 @@ class Crossmatcher:
         self.catalogue_cached = True
         return self.catalogue
 
-    def _expand_id_with_variants(self, input_id, id_str):
+    def _expand_id_with_variants(self, input_id, id_str) -> list[tuple[str, str]]:
         """Expand an ID with possessive, NAME, and SIMBAD prefix variants."""
         id_str = id_str.strip()
         variants = [id_str]
@@ -275,7 +243,9 @@ class Crossmatcher:
             name_list = input_table[self.input_starname_key].tolist()
             self.load_alternate_ids(name_list)
 
-        alt_ids_without_nulls = self.alternate_ids[~self.alternate_ids["id"].mask]
+        id_col = self.alternate_ids["id"]
+        valid = (id_col != "") & (id_col != "--") # '--' is astropy masked representation
+        alt_ids_without_nulls = self.alternate_ids[valid]
             
         self_joined = alt_ids_without_nulls.to_pandas().merge(
             alt_ids_without_nulls.to_pandas(),
@@ -334,13 +304,12 @@ class Crossmatcher:
 
 
 
-    def coordinate_crossmatch(self, input_table, ra_key="ra", dec_key="dec", distance_key="sy_dist") -> Tuple[Table]:
+    def coordinate_crossmatch(self, input_table, ra_key="ra", dec_key="dec") -> Table:
         if not self.catalogue_cached:
             self.load_catalog()
 
-        epochs = [coord_epoch(rl, dr3, dr2) for rl, dr3, dr2 in 
+        epochs = [coord_epoch(rl, dr3, dr2) for rl, dr3, dr2 in
                   zip(self.catalogue['ra_reflink'], self.catalogue['gaia_dr3_id'], self.catalogue['gaia_dr2_id'])]
-        
         self.catalogue['coord_epoch'] = MaskedColumn(
             np.ma.MaskedArray([e if e is not None else 0.0 for e in epochs],
                               mask=[e is None for e in epochs]),
@@ -353,51 +322,11 @@ class Crossmatcher:
             self.catalogue["coord_epoch"],
             minimum=self.search_radius_arcsec
         )
-        mean_dist_err = (self.catalogue["sy_disterr1"] - self.catalogue["sy_disterr2"]).filled(0) / 2
 
-        # 2D sky matching — distance irrelevant for angular separation
-        coords_input     = SkyCoord(ra=input_table[ra_key]*u.deg, dec=input_table[dec_key]*u.deg)
+        coords_input = SkyCoord(ra=input_table[ra_key]*u.deg, dec=input_table[dec_key]*u.deg)
         coords_catalogue = SkyCoord(ra=self.catalogue["ra"]*u.deg, dec=self.catalogue["dec"]*u.deg)
         idx2d, sep2d, _  = coords_catalogue.match_to_catalog_sky(coords_input)
         sep2d_mask = sep2d < per_row_radius_2d
-
-        # 3D spatial matching — skip rows with zero or missing distance to avoid
-        # degenerate matches where both stars collapse to the 3D origin
-        has_distance_input = input_table[distance_key] > 0
-        has_distance_catalogue = self.catalogue["sy_dist"] > 0
-
-        input_3d = input_table[has_distance_input]
-        cat_3d = self.catalogue[has_distance_catalogue]
-        coords_input_3d = SkyCoord(
-            ra=input_3d[ra_key]*u.deg, dec=input_3d[dec_key]*u.deg,
-            distance=input_3d[distance_key]*u.pc,
-        )
-        coords_cat_3d = SkyCoord(
-            ra=cat_3d["ra"]*u.deg, dec=cat_3d["dec"]*u.deg,
-            distance=cat_3d["sy_dist"]*u.pc,
-        )
-        per_row_radius_3d = allowed_3d_seperation(
-            per_row_radius_2d[has_distance_catalogue],
-            cat_3d["st_radv"].filled(0),
-            cat_3d["sy_dist"],
-            mean_dist_err[has_distance_catalogue],
-            cat_3d["sy_gaiamag"].filled(np.inf),
-            cat_3d["coord_epoch"],
-            minimum=self.search_radius_pc
-        )
-        idx3d, _, sep3d = coords_cat_3d.match_to_catalog_3d(coords_input_3d)
-        sep3d_mask = sep3d < per_row_radius_3d
-
-        # idx3d indexes into input_3d; map back to original input_table row positions
-        input_valid_idx = np.where(has_distance_input)[0]
-
-        self.coords3d_matched = astropy.table.hstack(
-            [input_table[input_valid_idx[idx3d[sep3d_mask]]], cat_3d[sep3d_mask]],
-            table_names=[self.input_suffix, self.catalogue_suffix],
-            join_type="exact"
-        )
-        self.coords3d_matched["match_type"] = "3d"
-        self.coords3d_matched["3d_sep"] = sep3d[sep3d_mask]
 
         self.coords2d_matched = astropy.table.hstack(
             [input_table[idx2d[sep2d_mask]], self.catalogue[sep2d_mask]],
@@ -406,34 +335,19 @@ class Crossmatcher:
         )
         self.coords2d_matched["match_type"] = "2d"
         self.coords2d_matched["2d_sep"] = sep2d[sep2d_mask]
-        return (self.coords3d_matched, self.coords2d_matched)
+        return self.coords2d_matched
 
     def combined_crossmatch(self, input_table):
-        # TODO: key debugging so output format matches
-        # TODO: proper keys passing (in both senses of the word)
-        # self.id_crossmatch(input_table)
-        # self.coordinate_crossmatch(input_table)
-        
-        if len(self.id_matched) == 0:
-            self.id_crossmatch(input_table)
-        if len(self.coords3d_matched) == 0 or len(self.coords2d_matched) == 0:
-            self.coordinate_crossmatch(input_table)        
-        
         uuid = self.planet_uuid
 
-        matched_listid = self.id_matched[uuid].tolist()
-        matched_list3d = self.coords3d_matched[uuid].tolist()
-        matched_list2d = self.coords2d_matched[uuid].tolist()
-    
-        only_coords3d = self.coords3d_matched[
-            ~np.isin(matched_list3d, matched_listid)
-        ]
-        only_coords2d = self.coords2d_matched[
-            ~(np.isin(matched_list2d, matched_listid)
-            | np.isin(matched_list2d, only_coords3d[uuid].tolist()))
+        id_results = self.id_crossmatch(input_table)
+        coord_results = self.coordinate_crossmatch(input_table)
+
+        only_coords = coord_results[
+            ~np.isin(coord_results[uuid].tolist(), id_results[uuid].tolist())
         ]
 
-        self.matched = astropy.table.vstack([self.id_matched, only_coords3d, only_coords2d], join_type="outer")
+        self.matched = astropy.table.vstack([id_results, only_coords], join_type="outer")
         return self.matched
 
 
