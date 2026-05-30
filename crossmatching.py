@@ -205,16 +205,21 @@ class Crossmatcher:
             how="inner"
         )
 
-        self.id_matched = input_table.to_pandas().merge(
+        # Rename input columns that overlap with the catalogue to {col}_input so
+        # the catalogue's versions keep their original names and no suffix is needed.
+        overlapping_columns = set(input_table.colnames) & set(self.catalogue.colnames) - {self.input_starname_key}
+        self.id_matched = input_table.to_pandas() \
+          .rename(columns={c: f"{c}_input" for c in overlapping_columns}) \
+          .merge(
             catalogue_projected_onto_ids,
             left_on=self.input_starname_key,
             right_on="input_ids",
-            how="right",
-            suffixes=(f"_{self.input_suffix}", f"_{self.catalogue_suffix}")
+            how="right"
         )
 
+        self.id_matched.drop(columns=["input_ids", "id"], inplace=True)
         self.id_matched["match_type"] = "id"
-        self.id_matched = astropy.table.Table.from_pandas(self.id_matched)
+        self.id_matched = Table.from_pandas(self.id_matched)
 
         # When the merge result is empty, Astropy can infer string columns as float64.
         # Cast only actual string columns back to strings so vstack can merge correctly.
@@ -326,15 +331,26 @@ class Crossmatcher:
         coords_input = SkyCoord(ra=input_table[ra_key]*u.deg, dec=input_table[dec_key]*u.deg)
         coords_catalogue = SkyCoord(ra=self.catalogue["ra"]*u.deg, dec=self.catalogue["dec"]*u.deg)
         idx2d, sep2d, _  = coords_catalogue.match_to_catalog_sky(coords_input)
-        sep2d_mask = sep2d < per_row_radius_2d
+        sep2d_mask = sep2d <= per_row_radius_2d
+
+        # Rename overlapping input columns to {col}_input before hstacking so the
+        # catalogue columns keep their original names with no suffix on eit her side.
+        overlapping_columns = list(
+            set(input_table.colnames) & set(self.catalogue.colnames) - {self.input_starname_key}
+        )
+
+        input_matched_slice = input_table[idx2d[sep2d_mask]].copy()
+        input_matched_slice.rename_columns(
+            overlapping_columns,
+            [f"{c}_input" for c in overlapping_columns]
+        )
 
         self.coords2d_matched = astropy.table.hstack(
-            [input_table[idx2d[sep2d_mask]], self.catalogue[sep2d_mask]],
-            table_names=[self.input_suffix, self.catalogue_suffix],
+            [input_matched_slice, self.catalogue[sep2d_mask]],
             join_type="exact"
         )
-        self.coords2d_matched["match_type"] = "2d"
-        self.coords2d_matched["2d_sep"] = sep2d[sep2d_mask]
+        self.coords2d_matched["match_type"] = "coordinates"
+        self.coords2d_matched["angular_separation"] = sep2d[sep2d_mask]
         return self.coords2d_matched
 
     def combined_crossmatch(self, input_table):
@@ -349,13 +365,3 @@ class Crossmatcher:
 
         self.matched = astropy.table.vstack([id_results, only_coords], join_type="outer")
         return self.matched
-
-
-
-if __name__ == "__main__":
-    cm = Crossmatcher()
-    input = Table.read("./input/HPIC_LC4_combined_d50.txt", format="ascii")
-    cm.load_catalog(from_file="pscomppars.txt")
-    cm.load_alternate_ids(input[cm.input_starname_key].tolist(), from_file="alternate_ids.txt")
-    final = cm.combined_crossmatch(input)
-    print(final)

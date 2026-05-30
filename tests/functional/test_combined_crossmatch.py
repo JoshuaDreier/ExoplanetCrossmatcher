@@ -62,7 +62,7 @@ def test_combined_finds_coord_match():
     planets = result["pl_name"].tolist()
     assert "Coord Star b" in planets
     match_types = result["match_type"].tolist()
-    assert match_types[planets.index("Coord Star b")] == "2d"
+    assert match_types[planets.index("Coord Star b")] == "coordinates"
 
 
 def test_combined_deduplicates():
@@ -141,4 +141,4 @@ def test_combined_one_id_one_2d():
 
     match_type = {row["star_name"]: row["match_type"] for row in result}
     assert match_type["id-star"] == "id"
-    assert match_type["2d-star"] == "2d"
+    assert match_type["2d-star"] == "coordinates"
