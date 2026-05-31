@@ -11,3 +11,7 @@ pandas
 scipy
 pytest
 pytest-mock
+pytest-check
+pytest-cov
+pytest-xdist
+plotly
