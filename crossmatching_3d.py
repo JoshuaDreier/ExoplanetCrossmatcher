@@ -1,20 +1,15 @@
 # Legacy 3D coordinate crossmatching — kept for notebook use.
-# Notebooks that need 3D matching should import Crossmatcher3D from here
-# instead of Crossmatcher from crossmatching.py.
+# Notebooks that need 3D matching should import Crossmatcher3D from here.
 import numpy as np
 import astropy
 import astropy.units as u
 from astropy.table import Table, MaskedColumn
 from astropy.coordinates import SkyCoord
 
-from crossmatching import (
-    Crossmatcher,
-    allowed_angular_seperation,
-    coord_epoch,
-)
+from crossmatching import Crossmatcher, allowed_angular_separation
 
 
-def allowed_3d_seperation(angular_radius_2d, radial_velocity, dist_pc, mean_dist_err,
+def allowed_3d_separation(angular_radius_2d, radial_velocity, dist_pc, mean_dist_err,
                            gaia_mag, epoch, hpic_epoch=2000, minimum=0.001*u.pc):
     """
     Estimate the maximum 3D spatial displacement (pc) of a source since hpic_epoch.
@@ -43,42 +38,41 @@ class Crossmatcher3D(Crossmatcher):
     """
 
     def __init__(self):
-        super().__init__()
+        from crossmatching import NEACatalog, SimbadIdSupplier
+        super().__init__(NEACatalog(), SimbadIdSupplier())
         self.coords3d_matched = Table()
         self.search_radius_pc = 0.001 * u.pc
 
     def coordinate_crossmatch(self, input_table, ra_key="ra", dec_key="dec",
                                distance_key="sy_dist"):
-        if not self.catalogue_cached:
+        if not self.catalog_cached:
             self.load_catalog()
 
-        epochs = [coord_epoch(rl, dr3, dr2) for rl, dr3, dr2 in
-                  zip(self.catalogue['ra_reflink'], self.catalogue['gaia_dr3_id'],
-                      self.catalogue['gaia_dr2_id'])]
-        self.catalogue['coord_epoch'] = MaskedColumn(
-            np.ma.MaskedArray([e if e is not None else 0.0 for e in epochs],
-                              mask=[e is None for e in epochs]),
-            name='coord_epoch',
-            description='Estimated epoch of sky coordinates (Julian year)')
+        if 'coord_epoch' not in self.catalog_table.colnames:
+            n = len(self.catalog_table)
+            self.catalog_table['coord_epoch'] = MaskedColumn(
+                np.ma.MaskedArray(np.zeros(n), mask=np.ones(n, dtype=bool)),
+                name='coord_epoch',
+            )
 
-        per_row_radius_2d = allowed_angular_seperation(
-            self.catalogue["sy_pm"] / 1000,
-            self.catalogue["sy_pmerr1"] / 1000,
-            self.catalogue["coord_epoch"],
-            minimum=self.search_radius_arcsec
+        per_row_radius_2d = allowed_angular_separation(
+            self.catalog_table["sy_pm"] / 1000,
+            self.catalog_table["sy_pmerr1"] / 1000,
+            self.catalog_table["coord_epoch"],
+            minimum=self.coordinate_search_radius
         )
 
         # 2D matching (via parent's coordinate_crossmatch)
         super().coordinate_crossmatch(input_table, ra_key, dec_key)
 
         # 3D matching
-        mean_dist_err = (self.catalogue["sy_disterr1"] - self.catalogue["sy_disterr2"]).filled(0) / 2
+        mean_dist_err = (self.catalog_table["sy_disterr1"] - self.catalog_table["sy_disterr2"]).filled(0) / 2
 
         has_distance_input     = input_table[distance_key] > 0
-        has_distance_catalogue = self.catalogue["sy_dist"] > 0
+        has_distance_catalog = self.catalog_table["sy_dist"] > 0
 
         input_3d = input_table[has_distance_input]
-        cat_3d   = self.catalogue[has_distance_catalogue]
+        cat_3d   = self.catalog_table[has_distance_catalog]
 
         coords_input_3d = SkyCoord(
             ra=input_3d[ra_key]*u.deg, dec=input_3d[dec_key]*u.deg,
@@ -88,11 +82,11 @@ class Crossmatcher3D(Crossmatcher):
             ra=cat_3d["ra"]*u.deg, dec=cat_3d["dec"]*u.deg,
             distance=cat_3d["sy_dist"]*u.pc,
         )
-        per_row_radius_3d = allowed_3d_seperation(
-            per_row_radius_2d[has_distance_catalogue],
+        per_row_radius_3d = allowed_3d_separation(
+            per_row_radius_2d[has_distance_catalog],
             cat_3d["st_radv"].filled(0),
             cat_3d["sy_dist"],
-            mean_dist_err[has_distance_catalogue],
+            mean_dist_err[has_distance_catalog],
             cat_3d["sy_gaiamag"].filled(np.inf),
             cat_3d["coord_epoch"],
             minimum=self.search_radius_pc
@@ -105,7 +99,7 @@ class Crossmatcher3D(Crossmatcher):
 
         self.coords3d_matched = astropy.table.hstack(
             [input_table[input_valid_idx[idx3d[sep3d_mask]]], cat_3d[sep3d_mask]],
-            table_names=[self.input_suffix, self.catalogue_suffix],
+            table_names=[self.input_suffix, ""],
             join_type="exact"
         )
         self.coords3d_matched["match_type"] = "3d"

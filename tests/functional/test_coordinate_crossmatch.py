@@ -1,5 +1,5 @@
 from astropy.table import Table
-from crossmatching import Crossmatcher
+from crossmatching import Crossmatcher, NEACatalog, SimbadIdSupplier
 from tests.functional.conftest import make_catalog
 
 _CATALOG_STAR = {
@@ -11,9 +11,9 @@ _CATALOG_STAR = {
 
 
 def _make_cm():
-    cm = Crossmatcher()
-    cm.catalogue = make_catalog(_CATALOG_STAR)
-    cm.catalogue_cached = True
+    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
+    cm.catalog_table = make_catalog(_CATALOG_STAR)
+    cm.catalog_cached = True
     return cm
 
 
@@ -41,13 +41,13 @@ def test_2d_no_match_when_far():
 def test_multiple_matches_no_index_mixup():
     """Three input stars each match a different catalog star.
     Verifies each input is paired with its own planet."""
-    cm = Crossmatcher()
-    cm.catalogue = make_catalog(
+    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
+    cm.catalog_table = make_catalog(
         {"hostname": "Alpha", "pl_name": "Alpha b", "ra":  10.0, "dec": 10.0},
         {"hostname": "Beta",  "pl_name": "Beta b",  "ra": 100.0, "dec": 20.0},
         {"hostname": "Gamma", "pl_name": "Gamma b", "ra": 200.0, "dec": 40.0},
     )
-    cm.catalogue_cached = True
+    cm.catalog_cached = True
     input_table = Table({
         "star_name": ["in-alpha", "in-beta", "in-gamma"],
         "ra":        [ 10.0,      100.0,      200.0],

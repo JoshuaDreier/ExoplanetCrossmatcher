@@ -4,11 +4,11 @@ consistent column schema, and that combined_crossmatch inherits that schema.
 
 Neither method should rename shared columns with _input / _cat suffixes —
 the output columns should be the same identifiers that appear in the input
-table and the catalogue (ra, dec, …), not ra_input / ra_cat.
+table and the catalog (ra, dec, …), not ra_input / ra_cat.
 """
 
 from astropy.table import Table
-from crossmatching import Crossmatcher
+from crossmatching import Crossmatcher, NEACatalog, SimbadIdSupplier
 from tests.functional.conftest import make_catalog
 
 _CATALOG = {"hostname": "Schema Star", "pl_name": "Schema Star b", "ra": 100.0, "dec": 20.0}
@@ -22,9 +22,9 @@ _INPUT = Table({
 
 def _make_cm():
     """Crossmatcher where the single star is reachable by both ID and coordinates."""
-    cm = Crossmatcher()
-    cm.catalogue = make_catalog(_CATALOG)
-    cm.catalogue_cached = True
+    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
+    cm.catalog_table = make_catalog(_CATALOG)
+    cm.catalog_cached = True
     cm.alternate_ids = Table({
         "input_ids": ["schema-input"],
         "id":        ["Schema Star"],
@@ -39,7 +39,7 @@ def test_id_and_coord_output_columns_match():
     The only acceptable differences are method-specific bookkeeping columns:
     angular_separation (coordinate only) and coord_epoch (coordinate only).
     The core columns — star_name, ra, dec, hostname, pl_name, match_type, and
-    all other catalogue columns — must be identical in both outputs so that
+    all other catalog columns — must be identical in both outputs so that
     combined_crossmatch can vstack them without gaps or duplication.
     """
     cm_id    = _make_cm()
@@ -64,8 +64,8 @@ def test_id_and_coord_output_columns_match():
 def test_combined_crossmatch_column_schema():
     """combined_crossmatch output column schema:
 
-    - Catalogue columns keep their original names (ra, dec, …).
-    - Input columns that share a name with the catalogue are present under the
+    - Catalog columns keep their original names (ra, dec, …).
+    - Input columns that share a name with the catalog are present under the
       {col}_input suffix (ra_input, dec_input, …).
     - No _cat suffix appears anywhere — only the input side is ever suffixed.
     - Mandatory bookkeeping and identifier columns are present.

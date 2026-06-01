@@ -1,6 +1,6 @@
 import pytest
 from astropy.table import Table, MaskedColumn, Column
-from crossmatching import Crossmatcher
+from crossmatching import Crossmatcher, NEACatalog, SimbadIdSupplier
 
 
 def make_catalog(*rows: dict[str, str | float]) -> Table:
@@ -34,4 +34,4 @@ def make_catalog(*rows: dict[str, str | float]) -> Table:
 
 @pytest.fixture
 def fresh_cm():
-    return Crossmatcher()
+    return Crossmatcher(NEACatalog(), SimbadIdSupplier())

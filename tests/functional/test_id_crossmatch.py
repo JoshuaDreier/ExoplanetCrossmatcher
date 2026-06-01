@@ -1,5 +1,5 @@
 from astropy.table import Table, Column
-from crossmatching import Crossmatcher
+from crossmatching import Crossmatcher, NEACatalog, SimbadIdSupplier
 from tests.functional.conftest import make_catalog
 
 
@@ -8,9 +8,9 @@ def _make_cm(catalog_rows, alt_id_pairs):
     Build a Crossmatcher with injected catalog and alternate_ids.
     alt_id_pairs: list of (input_id, catalog_id) tuples.
     """
-    cm = Crossmatcher()
-    cm.catalogue = make_catalog(*catalog_rows)
-    cm.catalogue_cached = True
+    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
+    cm.catalog_table = make_catalog(*catalog_rows)
+    cm.catalog_cached = True
     if alt_id_pairs:
         cm.alternate_ids = Table({
             "input_ids": [p[0] for p in alt_id_pairs],

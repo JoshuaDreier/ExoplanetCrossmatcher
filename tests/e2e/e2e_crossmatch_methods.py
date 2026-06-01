@@ -1,4 +1,4 @@
-from crossmatching import Crossmatcher
+from crossmatching import Crossmatcher, NEACatalog, SimbadIdSupplier
 import pytest
 
 def id_crossmatch(crossmatcher: Crossmatcher, query_row):
@@ -14,14 +14,14 @@ def combined_crossmatch(crossmatcher: Crossmatcher, query_row):
 
 @pytest.fixture(scope="session")
 def loaded_matcher():
-    cm = Crossmatcher()
+    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
     cm.load_catalog(from_file="pscomppars.txt")
     return cm
 
 
 @pytest.fixture(scope="function")
 def stateless_matcher(loaded_matcher):
-    cm = Crossmatcher()
-    cm.catalogue = loaded_matcher.catalogue  # reference, not a reload
-    cm.catalogue_cached = True
+    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
+    cm.catalog_table = loaded_matcher.catalog_table  # reference, not a reload
+    cm.catalog_cached = True
     yield cm
