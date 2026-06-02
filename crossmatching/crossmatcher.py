@@ -132,15 +132,16 @@ class Crossmatcher:
             how="inner"
         )
 
+        self.id_matched = input_table.to_pandas() 
         overlapping_columns = set(input_table.colnames) & set(self.catalog_table.colnames) - {input_starname_key}
-        self.id_matched = input_table.to_pandas() \
-            .rename(columns={c: f"{c}_{self.input_suffix}" for c in overlapping_columns}) \
-            .merge(
-                catalog_projected_onto_ids,
-                left_on=input_starname_key,
-                right_on=input_col,
-                how="inner"
-            )
+        if overlapping_columns:
+            self.id_matched.rename(columns={c: f"{c}_{self.input_suffix}" for c in overlapping_columns}, inplace=True)
+        self.id_matched = self.id_matched.merge(
+            catalog_projected_onto_ids,
+            left_on=input_starname_key,
+            right_on=input_col,
+            how="inner"
+        )
 
         self.id_matched.drop(columns=[input_col, id_col], inplace=True)
         self.id_matched[self.match_type_key] = self.id_match_label
@@ -267,14 +268,15 @@ class Crossmatcher:
         idx2d, sep2d, _ = coords_catalog.match_to_catalog_sky(coords_input)
         sep2d_mask = sep2d <= per_row_radius_2d
 
+        input_matched_slice = input_table[idx2d[sep2d_mask]].copy()
         overlapping_columns = list(
             set(input_table.colnames) & set(self.catalog_table.colnames) - {input_starname_key}
         )
-        input_matched_slice = input_table[idx2d[sep2d_mask]].copy()
-        input_matched_slice.rename_columns(
-            overlapping_columns,
-            [f"{c}_{self.input_suffix}" for c in overlapping_columns]
-        )
+        if overlapping_columns:
+            input_matched_slice.rename_columns(
+                overlapping_columns,
+                [f"{c}_{self.input_suffix}" for c in overlapping_columns]
+            )
 
         self.coords2d_matched = astropy.table.hstack(
             [input_matched_slice, self.catalog_table[sep2d_mask]],
