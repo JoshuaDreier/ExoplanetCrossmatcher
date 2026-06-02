@@ -22,6 +22,5 @@ def loaded_matcher():
 @pytest.fixture(scope="function")
 def stateless_matcher(loaded_matcher):
     cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
-    cm.catalog_table = loaded_matcher.catalog_table  # reference, not a reload
-    cm.catalog_cached = True
+    cm._cache_catalog(loaded_matcher.catalog_table)  # reference, not a reload
     yield cm

@@ -45,12 +45,14 @@ class Crossmatcher3D(Crossmatcher):
 
     def coordinate_crossmatch(self, input_table, ra_key="ra", dec_key="dec",
                                distance_key="sy_dist"):
-        if not self.catalog_cached:
+        if self.catalog_table is None:
             self.load_catalog()
 
-        if 'coord_epoch' not in self.catalog_table.colnames:
+        if 'coord_epoch' in self.catalog_table.colnames:
+            epoch = self.catalog_table['coord_epoch']
+        else:
             n = len(self.catalog_table)
-            self.catalog_table['coord_epoch'] = MaskedColumn(
+            epoch = MaskedColumn(
                 np.ma.MaskedArray(np.zeros(n), mask=np.ones(n, dtype=bool)),
                 name='coord_epoch',
             )
@@ -58,7 +60,7 @@ class Crossmatcher3D(Crossmatcher):
         per_row_radius_2d = allowed_angular_separation(
             self.catalog_table["sy_pm"] / 1000,
             self.catalog_table["sy_pmerr1"] / 1000,
-            self.catalog_table["coord_epoch"],
+            epoch,
             minimum=self.coordinate_search_radius
         )
 
@@ -88,7 +90,7 @@ class Crossmatcher3D(Crossmatcher):
             cat_3d["sy_dist"],
             mean_dist_err[has_distance_catalog],
             cat_3d["sy_gaiamag"].filled(np.inf),
-            cat_3d["coord_epoch"],
+            epoch[has_distance_catalog],
             minimum=self.search_radius_pc
         )
         idx3d, _, sep3d = coords_cat_3d.match_to_catalog_3d(coords_input_3d)

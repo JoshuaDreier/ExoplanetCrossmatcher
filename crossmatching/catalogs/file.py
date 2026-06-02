@@ -33,7 +33,7 @@ class FileCatalog(CatalogBase):
     def download(self) -> Table:
         raise NotImplementedError("FileCatalog has no remote source. Use load_raw() directly.")
 
-    def load(self, from_file: str = None, format: str = None) -> Table:
+    def load(self, from_file: str = None, format: str = None, **kwargs) -> Table:
         path = from_file or self.path
         fmt = format or self.format
-        return self.load_raw(path, format=fmt)
+        return self.load_raw(path, format=fmt, **kwargs)

@@ -23,13 +23,11 @@ _INPUT = Table({
 def _make_cm():
     """Crossmatcher where the single star is reachable by both ID and coordinates."""
     cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
-    cm.catalog_table = make_catalog(_CATALOG)
-    cm.catalog_cached = True
-    cm.alternate_ids = Table({
-        "input_ids": ["schema-input"],
-        "id":        ["Schema Star"],
-    })
-    cm.alternate_ids_cached = True
+    cm._cache_catalog(make_catalog(_CATALOG))
+    cm._cache_alternate_ids(
+        Table({"input_ids": ["schema-input"], "id": ["Schema Star"]}),
+        ["schema-input"],
+    )
     return cm
 
 

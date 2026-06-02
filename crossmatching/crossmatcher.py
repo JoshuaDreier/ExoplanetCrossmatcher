@@ -69,9 +69,8 @@ class Crossmatcher:
         self.input_starname_key = input_starname_key
         self.coordinate_search_radius = coordinate_search_radius
         self.catalog_table: Table = None
-        self.catalog_cached = False
         self.alternate_ids: Table = None
-        self.alternate_ids_cached = False
+        self._ids_for_names: frozenset | None = None
         self.id_matched: Table = None
         self.coords2d_matched: Table = None
         self.matched: Table = None
@@ -79,21 +78,35 @@ class Crossmatcher:
         self.input_suffix = "input"
         self.planet_uuid = self.catalog.planet_uuid
 
-    def load_catalog(self, from_file=None, format="ascii") -> Table:
-        self.catalog_table = self.catalog.load(from_file=from_file, format=format) if from_file else self.catalog.load()
-        self.catalog_cached = True
+    def _cache_catalog(self, table: Table) -> None:
+        self.catalog_table = table
+
+    def _cache_alternate_ids(self, table: Table, name_list: list[str]) -> None:
+        self.alternate_ids = table
+        self._ids_for_names = frozenset(name_list)
+
+    def load_catalog(self, from_file=None, format="ascii", **kwargs) -> Table:
+        self._cache_catalog(self.catalog.load(from_file=from_file, format=format, **kwargs))
         return self.catalog_table
 
     def load_alternate_ids(self, name_list, from_file=None) -> Table:
-        self.alternate_ids = self.id_supplier.load_alternate_ids(name_list, from_file=from_file)
-        self.alternate_ids_cached = True
+        self._cache_alternate_ids(
+            self.id_supplier.load_alternate_ids(name_list, from_file=from_file),
+            name_list,
+        )
         return self.alternate_ids
 
     def id_crossmatch(self, input_table):
         name_list = input_table[self.input_starname_key].tolist()
-        if not self.alternate_ids_cached:
+        name_set = frozenset(name_list)
+        if self.alternate_ids is None or not name_set <= self._ids_for_names:
             self.load_alternate_ids(name_list)
-        if not self.catalog_cached:
+        elif name_set < self._ids_for_names:
+            self._cache_alternate_ids(
+                self.alternate_ids[np.isin(self.alternate_ids["input_ids"], name_list)],
+                name_list,
+            )
+        if self.catalog_table is None:
             self.load_catalog()
 
         host_key = self.catalog.host_key
@@ -147,9 +160,15 @@ class Crossmatcher:
         return self.id_matched
 
     def find_duplicates(self, input_table, full=False) -> Table:
-        if not self.alternate_ids_cached:
-            name_list = input_table[self.input_starname_key].tolist()
+        name_list = input_table[self.input_starname_key].tolist()
+        name_set = frozenset(name_list)
+        if self.alternate_ids is None or not name_set <= self._ids_for_names:
             self.load_alternate_ids(name_list)
+        elif name_set < self._ids_for_names:
+            self._cache_alternate_ids(
+                self.alternate_ids[np.isin(self.alternate_ids["input_ids"], name_list)],
+                name_list,
+            )
 
         id_col = self.alternate_ids["id"]
         valid = (id_col != "") & (id_col != "--")
@@ -201,14 +220,14 @@ class Crossmatcher:
         return copy
 
     def coordinate_crossmatch(self, input_table, ra_key="ra", dec_key="dec") -> Table:
-        if not self.catalog_cached:
+        if self.catalog_table is None:
             self.load_catalog()
 
-        if 'coord_epoch' not in self.catalog_table.colnames:
-            # No epoch info in this catalog — mask all rows so allowed_angular_separation
-            # falls back to unknown_default for every entry.
+        if 'coord_epoch' in self.catalog_table.colnames:
+            epoch = self.catalog_table['coord_epoch']
+        else:
             n = len(self.catalog_table)
-            self.catalog_table['coord_epoch'] = MaskedColumn(
+            epoch = MaskedColumn(
                 np.ma.MaskedArray(np.zeros(n), mask=np.ones(n, dtype=bool)),
                 name='coord_epoch',
                 description='Estimated epoch of sky coordinates (Julian year)',
@@ -227,7 +246,7 @@ class Crossmatcher:
 
         per_row_radius_2d = allowed_angular_separation(
             pm, pmerr,
-            self.catalog_table["coord_epoch"],
+            epoch,
             minimum=self.coordinate_search_radius
         )
 

@@ -3,27 +3,30 @@ from crossmatching import Crossmatcher, NEACatalog, SimbadIdSupplier
 from tests.functional.conftest import make_catalog
 
 
-def _make_cm(catalog_rows, alt_id_pairs):
+def _make_cm(catalog_rows, alt_id_pairs, query_names=None):
     """
     Build a Crossmatcher with injected catalog and alternate_ids.
     alt_id_pairs: list of (input_id, catalog_id) tuples.
+    query_names: the full set of names that were "queried" (may be a superset of
+                 the alt_id_pairs input IDs, for stars that returned no results).
+                 Defaults to the input IDs in alt_id_pairs.
     """
     cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
-    cm.catalog_table = make_catalog(*catalog_rows)
-    cm.catalog_cached = True
+    cm._cache_catalog(make_catalog(*catalog_rows))
     if alt_id_pairs:
-        cm.alternate_ids = Table({
+        ids_table = Table({
             "input_ids": [p[0] for p in alt_id_pairs],
             "id":        [p[1] for p in alt_id_pairs],
         })
     else:
         # Explicit string dtype prevents pandas from inferring float64 on empty columns,
         # which would break id_crossmatch's alt_df["id"].str.split() call.
-        cm.alternate_ids = Table({
+        ids_table = Table({
             "input_ids": Column([], dtype="U64"),
             "id":        Column([], dtype="U64"),
         })
-    cm.alternate_ids_cached = True
+    effective_names = query_names if query_names is not None else [p[0] for p in alt_id_pairs]
+    cm._cache_alternate_ids(ids_table, effective_names)
     return cm
 
 
@@ -86,6 +89,7 @@ def test_id_no_false_positives():
             "pl_name": "Fake Star B b",
         },],
         alt_id_pairs=[("fake id 1", "Fake Star A")],
+        query_names=["fake id 1", "fake id 2"],
     )
     input_table = Table({"star_name": ["fake id 1", "fake id 2"]})
     result = cm.id_crossmatch(input_table)

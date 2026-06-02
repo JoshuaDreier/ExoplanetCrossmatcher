@@ -10,11 +10,13 @@ def cm_with_duplicates():
         Star C is unique
     """
     cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
-    cm.alternate_ids = Table({
-        "input_ids": ["Star A", "Star B", "Star C"],
-        "id": MaskedColumn(["shared_id", "shared_id", "unique_id"], mask=[False, False, False]),
-    })
-    cm.alternate_ids_cached = True
+    cm._cache_alternate_ids(
+        Table({
+            "input_ids": ["Star A", "Star B", "Star C"],
+            "id": MaskedColumn(["shared_id", "shared_id", "unique_id"], mask=[False, False, False]),
+        }),
+        ["Star A", "Star B", "Star C"],
+    )
     return cm
 
 
