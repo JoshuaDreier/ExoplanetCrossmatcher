@@ -1,7 +1,13 @@
 from astropy.table import Table
 
+from crossmatching.config import id_supplier as _cfg
+
 
 class IdSupplierBase:
+    input_col:     str = _cfg["input_col"]
+    id_col:        str = _cfg["id_col"]
+    null_sentinel: str = _cfg["null_sentinel"]
+
     def download(self, name_list: list[str]) -> Table:
         """Query the remote source and return the raw Table."""
         raise NotImplementedError

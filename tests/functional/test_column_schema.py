@@ -22,7 +22,7 @@ _INPUT = Table({
 
 def _make_cm():
     """Crossmatcher where the single star is reachable by both ID and coordinates."""
-    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
+    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier(), input_starname_key="star_name")
     cm._cache_catalog(make_catalog(_CATALOG))
     cm._cache_alternate_ids(
         Table({"input_ids": ["schema-input"], "id": ["Schema Star"]}),

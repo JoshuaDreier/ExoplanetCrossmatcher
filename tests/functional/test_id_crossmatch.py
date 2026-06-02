@@ -11,7 +11,7 @@ def _make_cm(catalog_rows, alt_id_pairs, query_names=None):
                  the alt_id_pairs input IDs, for stars that returned no results).
                  Defaults to the input IDs in alt_id_pairs.
     """
-    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
+    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier(), input_starname_key="star_name")
     cm._cache_catalog(make_catalog(*catalog_rows))
     if alt_id_pairs:
         ids_table = Table({

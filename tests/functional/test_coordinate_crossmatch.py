@@ -11,7 +11,7 @@ _CATALOG_STAR = {
 
 
 def _make_cm():
-    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
+    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier(), input_starname_key="star_name")
     cm._cache_catalog(make_catalog(_CATALOG_STAR))
     return cm
 
@@ -40,7 +40,7 @@ def test_2d_no_match_when_far():
 def test_multiple_matches_no_index_mixup():
     """Three input stars each match a different catalog star.
     Verifies each input is paired with its own planet."""
-    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
+    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier(), input_starname_key="star_name")
     cm._cache_catalog(make_catalog(
         {"hostname": "Alpha", "pl_name": "Alpha b", "ra":  10.0, "dec": 10.0},
         {"hostname": "Beta",  "pl_name": "Beta b",  "ra": 100.0, "dec": 20.0},

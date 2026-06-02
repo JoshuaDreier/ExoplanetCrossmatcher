@@ -2,8 +2,7 @@ import astropy
 import numpy as np
 from numpy.typing import ArrayLike
 import pandas as pd
-import pyvo
-from astropy.table import Table, Column, MaskedColumn
+from astropy.table import Table, MaskedColumn
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
@@ -11,6 +10,7 @@ from crossmatching.catalogs.base import CatalogBase
 from crossmatching.catalogs.nea import NEACatalog
 from crossmatching.id_suppliers.base import IdSupplierBase
 from crossmatching.id_suppliers.simbad import SimbadIdSupplier
+from crossmatching.config import crossmatcher as _cm_cfg
 
 
 def allowed_angular_separation(
@@ -61,21 +61,26 @@ class Crossmatcher:
         self,
         catalog: CatalogBase,
         id_supplier: IdSupplierBase,
-        input_starname_key: str = "star_name",
+        input_starname_key: str,
         coordinate_search_radius: u.Quantity = 10*u.arcsec,
+        input_suffix: str = "input",
+        **kwargs
     ):
-        self.catalog = catalog 
+        self.catalog = catalog
         self.id_supplier = id_supplier
         self.input_starname_key = input_starname_key
         self.coordinate_search_radius = coordinate_search_radius
+        self.input_suffix = input_suffix
+        self.match_type_key   = _cm_cfg["match_type_key"] if "match_type_key" not in kwargs else kwargs["match_type_key"]
+        self.id_match_label   = _cm_cfg["id_match_label"] if "id_match_label" not in kwargs else kwargs["id_match_label"]
+        self.coord_match_label = _cm_cfg["coord_match_label"] if "coord_match_label" not in kwargs else kwargs["coord_match_label"]
+        self.angular_sep_key  = _cm_cfg["angular_sep_key"] if "angular_sep_key" not in kwargs else kwargs["angular_sep_key"]
         self.catalog_table: Table = None
         self.alternate_ids: Table = None
         self._ids_for_names: frozenset | None = None
         self.id_matched: Table = None
         self.coords2d_matched: Table = None
         self.matched: Table = None
-        self.catalog_suffix = "cat"
-        self.input_suffix = "input"
         self.planet_uuid = self.catalog.planet_uuid
 
     def _cache_catalog(self, table: Table) -> None:
@@ -103,7 +108,7 @@ class Crossmatcher:
             self.load_alternate_ids(name_list)
         elif name_set < self._ids_for_names:
             self._cache_alternate_ids(
-                self.alternate_ids[np.isin(self.alternate_ids["input_ids"], name_list)],
+                self.alternate_ids[np.isin(self.alternate_ids[self.id_supplier.input_col], name_list)],
                 name_list,
             )
         if self.catalog_table is None:
@@ -114,30 +119,33 @@ class Crossmatcher:
         # Collapse runs of whitespace before joining. Catalogs don't agree on internal spacing:
         # Example: SIMBAD stores "Ross  128" (two spaces) while NEA stores "Ross 128" (one space), so an
         # exact-string join silently drops the match without this normalization.
+        input_col = self.id_supplier.input_col
+        id_col = self.id_supplier.id_col
+
         cat_df = self.catalog_table.to_pandas()
         cat_df[host_key] = cat_df[host_key].str.split().str.join(" ")
         alt_df = self.alternate_ids.to_pandas()
-        alt_df["id"] = alt_df["id"].str.split().str.join(" ")
+        alt_df[id_col] = alt_df[id_col].str.split().str.join(" ")
 
         catalog_projected_onto_ids = cat_df.merge(
             alt_df,
             left_on=host_key,
-            right_on="id",
+            right_on=id_col,
             how="inner"
         )
 
         overlapping_columns = set(input_table.colnames) & set(self.catalog_table.colnames) - {self.input_starname_key}
         self.id_matched = input_table.to_pandas() \
-            .rename(columns={c: f"{c}_input" for c in overlapping_columns}) \
+            .rename(columns={c: f"{c}_{self.input_suffix}" for c in overlapping_columns}) \
             .merge(
                 catalog_projected_onto_ids,
                 left_on=self.input_starname_key,
-                right_on="input_ids",
+                right_on=input_col,
                 how="inner"
             )
 
-        self.id_matched.drop(columns=["input_ids", "id"], inplace=True)
-        self.id_matched["match_type"] = "id"
+        self.id_matched.drop(columns=[input_col, id_col], inplace=True)
+        self.id_matched[self.match_type_key] = self.id_match_label
         self.id_matched = Table.from_pandas(self.id_matched)
 
         # When the merge result is empty, Astropy can infer string columns as float64.
@@ -150,7 +158,7 @@ class Crossmatcher:
             name
             for name in self.alternate_ids.colnames
             if self.alternate_ids[name].dtype.kind in {"U", "S", "O"}
-        } | {self.input_starname_key, "match_type"}
+        } | {self.input_starname_key, self.match_type_key}
         for colname in self.id_matched.colnames:
             if colname in string_columns and self.id_matched[colname].dtype.kind in {"f", "i"}:
                 self.id_matched[colname] = self.id_matched[colname].astype("U")
@@ -166,24 +174,27 @@ class Crossmatcher:
             self.load_alternate_ids(name_list)
         elif name_set < self._ids_for_names:
             self._cache_alternate_ids(
-                self.alternate_ids[np.isin(self.alternate_ids["input_ids"], name_list)],
+                self.alternate_ids[np.isin(self.alternate_ids[self.id_supplier.input_col], name_list)],
                 name_list,
             )
 
-        id_col = self.alternate_ids["id"]
-        valid = (id_col != "") & (id_col != "--")
+        input_col = self.id_supplier.input_col
+        id_col_name = self.id_supplier.id_col
+        id_col = self.alternate_ids[id_col_name]
+        valid = (id_col != "") & (id_col != self.id_supplier.null_sentinel)
         alt_ids_without_nulls = self.alternate_ids[valid]
 
+        linked_col = f"{input_col}_linked"
         self_joined = alt_ids_without_nulls.to_pandas().merge(
             alt_ids_without_nulls.to_pandas(),
-            left_on="id",
-            right_on="id",
+            left_on=id_col_name,
+            right_on=id_col_name,
             how="inner",
             suffixes=("", "_linked")
         )
 
-        grouped: pd.DataFrame = self_joined.groupby('input_ids')['input_ids_linked'].unique().reset_index()
-        grouped.rename(columns={"input_ids_linked": "duplicate_names"}, inplace=True)
+        grouped: pd.DataFrame = self_joined.groupby(input_col)[linked_col].unique().reset_index()
+        grouped.rename(columns={linked_col: "duplicate_names"}, inplace=True)
         grouped['duplicate_names'] = grouped['duplicate_names'].apply(lambda x: list(sorted(x)))
         grouped['appearances'] = grouped['duplicate_names'].apply(len)
         grouped = grouped[grouped['appearances'] > 1]
@@ -264,15 +275,15 @@ class Crossmatcher:
         input_matched_slice = input_table[idx2d[sep2d_mask]].copy()
         input_matched_slice.rename_columns(
             overlapping_columns,
-            [f"{c}_input" for c in overlapping_columns]
+            [f"{c}_{self.input_suffix}" for c in overlapping_columns]
         )
 
         self.coords2d_matched = astropy.table.hstack(
             [input_matched_slice, self.catalog_table[sep2d_mask]],
             join_type="exact"
         )
-        self.coords2d_matched["match_type"] = "coordinates"
-        self.coords2d_matched["angular_separation"] = sep2d[sep2d_mask]
+        self.coords2d_matched[self.match_type_key] = self.coord_match_label
+        self.coords2d_matched[self.angular_sep_key] = sep2d[sep2d_mask]
         return self.coords2d_matched
 
     def combined_crossmatch(self, input_table):

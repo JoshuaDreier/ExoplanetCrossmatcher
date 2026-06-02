@@ -28,26 +28,26 @@ class SimbadIdSupplier(IdSupplierBase):
     def download(self, name_list: list[str]) -> Table:
         simbad = pyvo.dal.TAPService("https://simbad.cds.unistra.fr/simbad/sim-tap")
         return simbad.run_sync(
-            "SELECT input_ids, ids FROM input_ids LEFT JOIN ident ON input_ids.input_ids = ident.id LEFT JOIN ids USING(oidref)",
-            uploads={"input_ids": Table({"input_ids": name_list})}
+            f"SELECT input_ids, ids FROM input_ids LEFT JOIN ident ON input_ids.input_ids = ident.id LEFT JOIN ids USING(oidref)",
+            uploads={"input_ids": Table({self.input_col: name_list})}
         ).to_table()
 
     def load_alternate_ids(self, name_list: list[str], from_file: str = None, format: str = "ascii") -> Table:
         raw = self.load_raw(from_file, format=format) if from_file else self.download(name_list)
         if from_file:
-            raw = raw[np.isin(raw["input_ids"], name_list)]
+            raw = raw[np.isin(raw[self.input_col], name_list)]
         return self.preprocess(raw)
 
     def preprocess(self, raw: Table) -> Table:
         input_ids = []
         all_ids = []
         for row in raw:
-            input_id = str(row["input_ids"])
+            input_id = str(row[self.input_col])
             for id_str in str(row["ids"]).split("|"):
                 stripped = id_str.strip()
-                if not stripped or stripped == "--":
+                if not stripped or stripped == self.null_sentinel:
                     continue
                 for _, variant_id in self._expand_id_with_variants(input_id, id_str):
                     input_ids.append(input_id)
                     all_ids.append(variant_id)
-        return Table([input_ids, all_ids], names=["input_ids", "id"], dtype=["str", "str"])
+        return Table([input_ids, all_ids], names=[self.input_col, self.id_col], dtype=["str", "str"])

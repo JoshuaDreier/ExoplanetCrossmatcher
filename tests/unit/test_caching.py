@@ -9,7 +9,7 @@ def _catalog(hostname, pl_name):
 
 @pytest.fixture
 def cm():
-    instance = Crossmatcher(NEACatalog(), SimbadIdSupplier())
+    instance = Crossmatcher(NEACatalog(), SimbadIdSupplier(), input_starname_key="star_name")
     instance._cache_catalog(_catalog("GJ 1", "GJ 1 b"))
     return instance
 

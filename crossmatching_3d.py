@@ -37,9 +37,9 @@ class Crossmatcher3D(Crossmatcher):
     coordinate_crossmatch() returns (3d_result, 2d_result) as before.
     """
 
-    def __init__(self):
+    def __init__(self, input_starname_key: str):
         from crossmatching import NEACatalog, SimbadIdSupplier
-        super().__init__(NEACatalog(), SimbadIdSupplier())
+        super().__init__(NEACatalog(), SimbadIdSupplier(), input_starname_key=input_starname_key)
         self.coords3d_matched = Table()
         self.search_radius_pc = 0.001 * u.pc
 
