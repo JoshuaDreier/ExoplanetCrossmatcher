@@ -34,4 +34,4 @@ def make_catalog(*rows: dict[str, str | float]) -> Table:
 
 @pytest.fixture
 def fresh_cm():
-    return Crossmatcher(NEACatalog(), SimbadIdSupplier(), input_starname_key="star_name")
+    return Crossmatcher(NEACatalog(), SimbadIdSupplier())

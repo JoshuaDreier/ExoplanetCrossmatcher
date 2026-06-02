@@ -7,7 +7,7 @@ def test_remove_duplicates_reduces_row_count(cm_with_duplicates):
         "star_name": ["Star A", "Star B", "Star C"],
         "sy_dist": ["10.0", "10.0", "5.0"],
     })
-    result = cm_with_duplicates.remove_duplicates(input_table)
+    result = cm_with_duplicates.remove_duplicates(input_table, "star_name")
     assert len(result) == len(input_table) - 1
 
 
@@ -17,7 +17,7 @@ def test_remove_duplicates_keeps_more_complete_row(cm_with_duplicates):
         "star_name": ["Star A", "Star B", "Star C"],
         "sy_dist": ["", "1.0", "5.0"],
     })
-    result = cm_with_duplicates.remove_duplicates(input_table)
+    result = cm_with_duplicates.remove_duplicates(input_table, "star_name")
     star_names = result["star_name"].tolist()
     assert "Star B" in star_names
     assert "Star C" in star_names

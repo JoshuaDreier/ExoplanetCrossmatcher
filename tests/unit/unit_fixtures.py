@@ -9,7 +9,7 @@ def cm_with_duplicates():
         Star A and Star B share 'shared_id'
         Star C is unique
     """
-    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier(), input_starname_key="star_name")
+    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
     cm._cache_alternate_ids(
         Table({
             "input_ids": ["Star A", "Star B", "Star C"],

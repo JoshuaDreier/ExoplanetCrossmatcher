@@ -11,7 +11,7 @@ def _make_cm(catalog_rows, alt_id_pairs, query_names=None):
                  the alt_id_pairs input IDs, for stars that returned no results).
                  Defaults to the input IDs in alt_id_pairs.
     """
-    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier(), input_starname_key="star_name")
+    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
     cm._cache_catalog(make_catalog(*catalog_rows))
     if alt_id_pairs:
         ids_table = Table({
@@ -39,7 +39,7 @@ def test_id_match_found():
         alt_id_pairs=[("fake id", "Fake Star")],
     )
     input_table = Table({"star_name": ["fake id"]})
-    result = cm.id_crossmatch(input_table)
+    result = cm.id_crossmatch(input_table, "star_name")
     assert "Fake Star b" in result["pl_name"].tolist()
 
 
@@ -52,7 +52,7 @@ def test_id_no_match_when_alternate_ids_empty():
         alt_id_pairs=[],
     )
     input_table = Table({"star_name": ["fake id"]})
-    result = cm.id_crossmatch(input_table)
+    result = cm.id_crossmatch(input_table, "star_name")
     assert len(result) == 0
 
 
@@ -72,7 +72,7 @@ def test_id_multiple_matches_no_index_mixup():
         ],
     )
     input_table = Table({"star_name": ["id-alpha", "id-beta", "id-gamma"]})
-    result = cm.id_crossmatch(input_table)
+    result = cm.id_crossmatch(input_table, "star_name")
     matched = {row["star_name"]: row["pl_name"] for row in result}
     assert matched["id-alpha"] == "Alpha b"
     assert matched["id-beta"]  == "Beta b"
@@ -92,7 +92,7 @@ def test_id_no_false_positives():
         query_names=["fake id 1", "fake id 2"],
     )
     input_table = Table({"star_name": ["fake id 1", "fake id 2"]})
-    result = cm.id_crossmatch(input_table)
+    result = cm.id_crossmatch(input_table, "star_name")
     planets = result["pl_name"].tolist()
     assert "Fake Star A b" in planets
     assert "Fake Star B b" not in planets

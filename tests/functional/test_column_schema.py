@@ -22,7 +22,7 @@ _INPUT = Table({
 
 def _make_cm():
     """Crossmatcher where the single star is reachable by both ID and coordinates."""
-    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier(), input_starname_key="star_name")
+    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
     cm._cache_catalog(make_catalog(_CATALOG))
     cm._cache_alternate_ids(
         Table({"input_ids": ["schema-input"], "id": ["Schema Star"]}),
@@ -43,8 +43,8 @@ def test_id_and_coord_output_columns_match():
     cm_id    = _make_cm()
     cm_coord = _make_cm()
 
-    id_result    = cm_id.id_crossmatch(_INPUT)
-    coord_result = cm_coord.coordinate_crossmatch(_INPUT)
+    id_result    = cm_id.id_crossmatch(_INPUT, "star_name")
+    coord_result = cm_coord.coordinate_crossmatch(_INPUT, "star_name")
 
     coord_only_extras = {"angular_separation", "coord_epoch"}
 
@@ -69,7 +69,7 @@ def test_combined_crossmatch_column_schema():
     - Mandatory bookkeeping and identifier columns are present.
     """
     cm = _make_cm()
-    result = cm.combined_crossmatch(_INPUT)
+    result = cm.combined_crossmatch(_INPUT, "star_name")
     colnames = result.colnames
 
     suffixed_cat = [c for c in colnames if c.endswith("_cat")]

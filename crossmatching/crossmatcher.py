@@ -61,14 +61,12 @@ class Crossmatcher:
         self,
         catalog: CatalogBase,
         id_supplier: IdSupplierBase,
-        input_starname_key: str,
         coordinate_search_radius: u.Quantity = 10*u.arcsec,
         input_suffix: str = "input",
         **kwargs
     ):
         self.catalog = catalog
         self.id_supplier = id_supplier
-        self.input_starname_key = input_starname_key
         self.coordinate_search_radius = coordinate_search_radius
         self.input_suffix = input_suffix
         self.match_type_key   = _cm_cfg["match_type_key"] if "match_type_key" not in kwargs else kwargs["match_type_key"]
@@ -101,8 +99,8 @@ class Crossmatcher:
         )
         return self.alternate_ids
 
-    def id_crossmatch(self, input_table):
-        name_list = input_table[self.input_starname_key].tolist()
+    def id_crossmatch(self, input_table: Table, input_starname_key: str):
+        name_list = input_table[input_starname_key].tolist()
         name_set = frozenset(name_list)
         if self.alternate_ids is None or not name_set <= self._ids_for_names:
             self.load_alternate_ids(name_list)
@@ -134,12 +132,12 @@ class Crossmatcher:
             how="inner"
         )
 
-        overlapping_columns = set(input_table.colnames) & set(self.catalog_table.colnames) - {self.input_starname_key}
+        overlapping_columns = set(input_table.colnames) & set(self.catalog_table.colnames) - {input_starname_key}
         self.id_matched = input_table.to_pandas() \
             .rename(columns={c: f"{c}_{self.input_suffix}" for c in overlapping_columns}) \
             .merge(
                 catalog_projected_onto_ids,
-                left_on=self.input_starname_key,
+                left_on=input_starname_key,
                 right_on=input_col,
                 how="inner"
             )
@@ -158,17 +156,17 @@ class Crossmatcher:
             name
             for name in self.alternate_ids.colnames
             if self.alternate_ids[name].dtype.kind in {"U", "S", "O"}
-        } | {self.input_starname_key, self.match_type_key}
+        } | {input_starname_key, self.match_type_key}
         for colname in self.id_matched.colnames:
             if colname in string_columns and self.id_matched[colname].dtype.kind in {"f", "i"}:
                 self.id_matched[colname] = self.id_matched[colname].astype("U")
                 self.id_matched[colname] = np.char.strip(self.id_matched[colname])
 
-        self.id_matched[self.input_starname_key] = self.id_matched[self.input_starname_key].astype(str)
+        self.id_matched[input_starname_key] = self.id_matched[input_starname_key].astype(str)
         return self.id_matched
 
-    def find_duplicates(self, input_table, full=False) -> Table:
-        name_list = input_table[self.input_starname_key].tolist()
+    def find_duplicates(self, input_table: Table, input_starname_key: str, full=False) -> Table:
+        name_list = input_table[input_starname_key].tolist()
         name_set = frozenset(name_list)
         if self.alternate_ids is None or not name_set <= self._ids_for_names:
             self.load_alternate_ids(name_list)
@@ -204,13 +202,13 @@ class Crossmatcher:
         grouped = grouped.drop_duplicates(subset='duplicate_names')
         return Table.from_pandas(grouped)
 
-    def remove_duplicates(self, input_table) -> Table:
+    def remove_duplicates(self, input_table: Table, input_starname_key: str) -> Table:
         """Keep the row with the highest number of non-null values."""
-        duplicates = self.find_duplicates(input_table)
+        duplicates = self.find_duplicates(input_table, input_starname_key)
         drop_indices = []
         for dupe in duplicates:
             dupe_names = dupe["duplicate_names"]
-            dupes_index_comparison_array = np.array([input_table[self.input_starname_key].data == name for name in dupe_names])
+            dupes_index_comparison_array = np.array([input_table[input_starname_key].data == name for name in dupe_names])
 
             for arr, name in zip(dupes_index_comparison_array, dupe_names):
                 if np.sum(arr) != 1:
@@ -230,7 +228,7 @@ class Crossmatcher:
         copy.remove_rows(drop_indices)
         return copy
 
-    def coordinate_crossmatch(self, input_table, ra_key="ra", dec_key="dec") -> Table:
+    def coordinate_crossmatch(self, input_table: Table, input_starname_key: str, ra_key="ra", dec_key="dec") -> Table:
         if self.catalog_table is None:
             self.load_catalog()
 
@@ -270,7 +268,7 @@ class Crossmatcher:
         sep2d_mask = sep2d <= per_row_radius_2d
 
         overlapping_columns = list(
-            set(input_table.colnames) & set(self.catalog_table.colnames) - {self.input_starname_key}
+            set(input_table.colnames) & set(self.catalog_table.colnames) - {input_starname_key}
         )
         input_matched_slice = input_table[idx2d[sep2d_mask]].copy()
         input_matched_slice.rename_columns(
@@ -286,11 +284,11 @@ class Crossmatcher:
         self.coords2d_matched[self.angular_sep_key] = sep2d[sep2d_mask]
         return self.coords2d_matched
 
-    def combined_crossmatch(self, input_table):
+    def combined_crossmatch(self, input_table: Table, input_starname_key: str):
         uuid = self.planet_uuid
 
-        id_results = self.id_crossmatch(input_table)
-        coord_results = self.coordinate_crossmatch(input_table)
+        id_results = self.id_crossmatch(input_table, input_starname_key)
+        coord_results = self.coordinate_crossmatch(input_table, input_starname_key)
 
         only_coords = coord_results[
             ~np.isin(coord_results[uuid].tolist(), id_results[uuid].tolist())

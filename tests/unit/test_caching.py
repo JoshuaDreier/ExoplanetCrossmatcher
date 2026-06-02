@@ -9,7 +9,7 @@ def _catalog(hostname, pl_name):
 
 @pytest.fixture
 def cm():
-    instance = Crossmatcher(NEACatalog(), SimbadIdSupplier(), input_starname_key="star_name")
+    instance = Crossmatcher(NEACatalog(), SimbadIdSupplier())
     instance._cache_catalog(_catalog("GJ 1", "GJ 1 b"))
     return instance
 
@@ -30,10 +30,10 @@ def test_id_crossmatch_reloads_alt_ids_for_disjoint_input(cm, monkeypatch):
 
     monkeypatch.setattr(cm.id_supplier, "load_alternate_ids", tracking_load)
 
-    cm.id_crossmatch(Table({"star_name": ["Star A"]}))
+    cm.id_crossmatch(Table({"star_name": ["Star A"]}), "star_name")
     assert call_count == 1
 
-    result_b = cm.id_crossmatch(Table({"star_name": ["Star B"]}))
+    result_b = cm.id_crossmatch(Table({"star_name": ["Star B"]}), "star_name")
     assert call_count == 2, "alt IDs were not reloaded for the new input (Bug A)"
     assert "Star A" not in result_b["star_name"].tolist()
 
@@ -50,8 +50,8 @@ def test_id_crossmatch_does_not_reload_for_same_input(cm, monkeypatch):
     monkeypatch.setattr(cm.id_supplier, "load_alternate_ids", tracking_load)
 
     input_a = Table({"star_name": ["Star A"]})
-    cm.id_crossmatch(input_a)
-    cm.id_crossmatch(input_a)
+    cm.id_crossmatch(input_a, "star_name")
+    cm.id_crossmatch(input_a, "star_name")
     assert call_count == 1, "alt IDs were reloaded unnecessarily for identical input"
 
 
@@ -69,9 +69,9 @@ def test_id_crossmatch_trims_cache_for_subset(cm, monkeypatch):
 
     monkeypatch.setattr(cm.id_supplier, "load_alternate_ids", tracking_load)
 
-    cm.id_crossmatch(Table({"star_name": ["Star A", "Star B"]}))
+    cm.id_crossmatch(Table({"star_name": ["Star A", "Star B"]}), "star_name")
     assert call_count == 1
 
-    cm.id_crossmatch(Table({"star_name": ["Star A"]}))
+    cm.id_crossmatch(Table({"star_name": ["Star A"]}), "star_name")
     assert call_count == 1, "cache was reloaded for a strict subset (should trim)"
     assert set(cm.alternate_ids["input_ids"].tolist()) == {"Star A"}
