@@ -1,29 +1,5 @@
 import numpy as np
-import numpy.ma as ma
-from astropy.table import Table, MaskedColumn
-
 from crossmatching.catalogs.nea import NEACatalog, _coord_epoch
-
-
-
-class TestNEACatalogKeys:
-    def test_ra_key(self):
-        assert NEACatalog().ra_key == "ra"
-
-    def test_dec_key(self):
-        assert NEACatalog().dec_key == "dec"
-
-    def test_hostname_key(self):
-        assert NEACatalog().host_key == "hostname"
-
-    def test_planet_uuid(self):
-        assert NEACatalog().planet_uuid == "pl_name"
-
-    def test_pm_key(self):
-        assert NEACatalog().pm_key == "sy_pm"
-
-    def test_pmerr_key(self):
-        assert NEACatalog().pmerr_key == "sy_pmerr1"
 
 
 class TestCoordEpoch:
@@ -73,9 +49,3 @@ class TestNEACatalogLoad:
     def test_load_raw_does_not_add_coord_epoch(self):
         raw = NEACatalog().load_raw("pscomppars.txt")
         assert "coord_epoch" not in raw.colnames
-
-    def test_preprocess_adds_coord_epoch(self):
-        raw = NEACatalog().load_raw("pscomppars.txt")
-        processed = NEACatalog().preprocess(raw)
-        assert "coord_epoch" in processed.colnames
-

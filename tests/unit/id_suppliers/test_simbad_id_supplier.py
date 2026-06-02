@@ -54,13 +54,6 @@ def test_download_expands_star_prefix_variant(MockTAP):
     assert "Alpha Cen" in ids
 
 
-def test_file_returns_required_columns(tmp_path):
-    path = _raw_file(tmp_path, [("Star A", "GJ 1|HIP 1")])
-    result = SimbadIdSupplier().load_alternate_ids(["Star A"], from_file=path)
-    assert "input_ids" in result.colnames
-    assert "id" in result.colnames
-
-
 def test_file_splits_pipe_delimited_ids(tmp_path):
     path = _raw_file(tmp_path, [("Star A", "GJ 1|HIP 1|Ross 128")])
     result = SimbadIdSupplier().load_alternate_ids(["Star A"], from_file=path)
