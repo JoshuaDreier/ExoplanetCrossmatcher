@@ -121,9 +121,10 @@ class Crossmatcher:
         id_col = self.id_supplier.id_col
 
         cat_df = self.catalog_table.to_pandas()
-        cat_df[host_key] = cat_df[host_key].str.split().str.join(" ")
+        cat_df[host_key]  = cat_df[host_key].str.split().str.join(" ")
         alt_df = self.alternate_ids.to_pandas()
-        alt_df[id_col] = alt_df[id_col].str.split().str.join(" ")
+        alt_df[id_col]    = alt_df[id_col].str.split().str.join(" ")
+        alt_df[input_col] = alt_df[input_col].str.split().str.join(" ")
 
         catalog_projected_onto_ids = cat_df.merge(
             alt_df,
@@ -132,7 +133,8 @@ class Crossmatcher:
             how="inner"
         )
 
-        self.id_matched = input_table.to_pandas() 
+        self.id_matched = input_table.to_pandas()
+        self.id_matched[input_starname_key] = self.id_matched[input_starname_key].str.split().str.join(" ")
         overlapping_columns = set(input_table.colnames) & set(self.catalog_table.colnames) - {input_starname_key}
         if overlapping_columns:
             self.id_matched.rename(columns={c: f"{c}_{self.input_suffix}" for c in overlapping_columns}, inplace=True)
