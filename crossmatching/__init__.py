@@ -5,3 +5,4 @@ from crossmatching.catalogs.file import FileCatalog
 from crossmatching.catalogs.exomercat import EMCCatalog
 from crossmatching.id_suppliers.base import IdSupplierBase
 from crossmatching.id_suppliers.simbad import SimbadIdSupplier
+from crossmatching.id_suppliers.emc import EMCIdSupplier

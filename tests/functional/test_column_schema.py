@@ -46,7 +46,7 @@ def test_id_and_coord_output_columns_match():
     id_result    = cm_id.id_crossmatch(_INPUT, "star_name")
     coord_result = cm_coord.coordinate_crossmatch(_INPUT, "star_name")
 
-    coord_only_extras = {"angular_separation", "coord_epoch"}
+    coord_only_extras = {cm_coord.angular_sep_key, "coord_epoch"}
 
     id_cols    = set(id_result.colnames)    - coord_only_extras
     coord_cols = set(coord_result.colnames) - coord_only_extras
