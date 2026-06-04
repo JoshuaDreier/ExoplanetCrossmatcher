@@ -1,9 +1,14 @@
-import re
 import numpy as np
 import pyvo
-from astropy.table import Table, MaskedColumn
+from astropy.table import Table
+from typing import Literal
 
 from crossmatching.catalogs.base import CatalogBase
+
+StatusValue = Literal["CONFIRMED", "CANDIDATE", "CONTROVERSIAL", "FALSE POSITIVE", "PRELIMINARY"]
+
+_DEFAULT_ALLOWED_STATUSES: list[StatusValue] = ["CONFIRMED", "CANDIDATE", "CONTROVERSIAL", "PRELIMINARY"]
+
 
 class EMCCatalog(CatalogBase):
     """Exo-MerCat catalog from the Exo-MerCat TAP service."""
@@ -14,15 +19,16 @@ class EMCCatalog(CatalogBase):
     pm_key = None
     pmerr_key = None
 
+    def __init__(self, allowed_statuses: list[StatusValue] | None = None):
+        self.allowed_statuses = allowed_statuses if allowed_statuses is not None else _DEFAULT_ALLOWED_STATUSES
+
     def download(self) -> Table:
         """
-        !WARNING: at the time of writing, Exo-MerCat TAP service is not regularly updates, 
-        it is recommended to locally run Exo-MerCat and loading the result as a file.
+        !WARNING: at the time of writing, Exo-MerCat TAP service is not regularly updated,
+        it is recommended to locally run Exo-MerCat and load the result as a file.
         """
-        # at the time of writing, exomercat TAP is n
         emc = pyvo.dal.TAPService("http://archives.ia2.inaf.it/vo/tap/projects/")
         return emc.run_sync("SELECT * FROM exomercat.exomercat").to_table()
 
     def preprocess(self, table: Table) -> Table:
-        return table
-
+        return table[np.isin(table["status"], self.allowed_statuses)]
