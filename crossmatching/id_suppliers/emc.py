@@ -29,6 +29,13 @@ class EMCIdSupplier(IdSupplierBase):
         if id_str.startswith("Gaia DR"):
             # SIMBAD stores "Gaia DR3 ..." but HPIC uses "GAIA DR3 ..."
             variants.append("GAIA" + id_str[4:])
+        if id_str.startswith("TIC-") and id_str[4:].isdigit():
+            # EMC stores "TIC-XXXXXXX" but HPIC uses "TIC XXXXXXX"
+            variants.append("TIC " + id_str[4:])
+        if len(id_str) > 2 and id_str[-2] == ' ' and id_str[-1] in 'ABCSN':
+            # Some catalogs append a stellar component letter (e.g. 'Kepler-1229 A') while
+            # others use the bare host name ('Kepler-1229'); include both forms
+            variants.append(id_str[:-2])
         return [(input_id, v) for v in variants]
 
     def preprocess(self, raw: Table) -> Table:

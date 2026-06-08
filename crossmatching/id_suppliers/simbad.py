@@ -22,6 +22,10 @@ class SimbadIdSupplier(IdSupplierBase):
             # SIMBAD sometimes includes "NAME " in front of star names (e.g. NAME Proxima Cen)
             # we include both versions
             variants.append(id_str.lstrip("NAME "))
+        if len(id_str) > 2 and id_str[-2] == ' ' and id_str[-1] in 'ABCSN':
+            # Some catalogs append a stellar component letter (e.g. 'Kepler-1229 A') while
+            # others use the bare host name ('Kepler-1229'); include both forms
+            variants.append(id_str[:-2])
 
         return [(input_id, v) for v in variants]
 
