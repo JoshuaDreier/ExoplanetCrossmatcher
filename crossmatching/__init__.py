@@ -6,3 +6,12 @@ from crossmatching.catalogs.exomercat import EMCCatalog
 from crossmatching.id_suppliers.base import IdSupplierBase
 from crossmatching.id_suppliers.simbad import SimbadIdSupplier
 from crossmatching.id_suppliers.emc import EMCIdSupplier
+from crossmatching.enrichment import StellarParamMerger, temperate_mask
+from crossmatching.param_sources import (
+    StellarParamSource,
+    HpicStellarParamSource,
+    NeaStellarParamSource,
+    SimbadStellarParamSource,
+    EpicStellarParamSource,
+    ToiStellarParamSource,
+)

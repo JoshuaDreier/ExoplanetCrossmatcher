@@ -32,7 +32,7 @@ class SimbadIdSupplier(IdSupplierBase):
     def download(self, name_list: list[str]) -> Table:
         simbad = pyvo.dal.TAPService("https://simbad.cds.unistra.fr/simbad/sim-tap")
         return simbad.run_sync(
-            f"SELECT input_ids, ids FROM input_ids LEFT JOIN ident ON input_ids.input_ids = ident.id LEFT JOIN ids USING(oidref)",
+            "SELECT input_ids, ids FROM input_ids LEFT JOIN ident ON input_ids.input_ids = ident.id LEFT JOIN ids USING(oidref)",
             uploads={"input_ids": Table({self.input_col: name_list})}
         ).to_table()
 
