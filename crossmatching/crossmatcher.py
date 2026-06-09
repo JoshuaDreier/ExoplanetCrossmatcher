@@ -28,7 +28,8 @@ def allowed_angular_separation(
     """
     epoch_arr = np.ma.asarray(epoch)
     pm_arr = np.ma.asarray(proper_motion)
-    unknown = np.ma.getmaskarray(epoch_arr) | np.ma.getmaskarray(pm_arr)
+    pm_err_arr = np.ma.asarray(pm_err)
+    unknown = np.ma.getmaskarray(epoch_arr) | np.ma.getmaskarray(pm_arr) | np.ma.getmaskarray(pm_err_arr)
 
     dt = np.abs(np.ma.filled(epoch_arr, hpic_epoch) - hpic_epoch)
     pm = np.ma.filled(pm_arr, 0.0)

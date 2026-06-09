@@ -4,7 +4,9 @@ from astropy.table import MaskedColumn
 
 from crossmatching.enrichment import (
     classify_spectral_type,
+    mass_radius_chen_kipping,
     ms_radius_from_teff,
+    rocky_mask,
     spectype_display,
     temperate_mask,
     teff_to_spectype,
@@ -114,6 +116,100 @@ def test_temperate_mask_masked_err_falls_back_to_central():
     err2 = MaskedColumn([0.5], mask=[True], name='flux_rel_err2')
     # Central 2.0 > 1.77 → False, even though unmasked err2=0.5 would overlap
     assert not temperate_mask(flux, None, err2, lower=0.25, upper=1.77, use_interval=True)[0]
+
+
+# --- mass_radius_chen_kipping ---
+
+def test_mass_radius_zero_guard():
+    assert mass_radius_chen_kipping(0.0) == 0.0
+
+
+def test_mass_radius_negative_guard():
+    assert mass_radius_chen_kipping(-1.0) == 0.0
+
+
+def test_mass_radius_terran():
+    # 1 M_Earth → R = 1.008 × 1^0.279 = 1.008
+    assert mass_radius_chen_kipping(1.0) == pytest.approx(1.008)
+
+
+def test_mass_radius_neptunian():
+    # 10 M_Earth → R = 0.808 × 10^0.589
+    expected = 0.808 * 10 ** 0.589
+    assert mass_radius_chen_kipping(10.0) == pytest.approx(expected, rel=1e-4)
+
+
+def test_mass_radius_boundary_continuous():
+    # Both branches should agree at 2.04 M_Earth to < 0.1%
+    terran    = 1.008 * 2.04 ** 0.279
+    neptunian = 0.808 * 2.04 ** 0.589
+    assert abs(terran - neptunian) / terran < 0.001
+
+
+# --- rocky_mask ---
+
+def _r(vals, mask=None):
+    if mask is None:
+        mask = [False] * len(vals)
+    return MaskedColumn(vals, mask=mask, name='r_earth')
+
+
+def _rb(vals, mask=None):
+    """Build a MaskedColumn for r_earth_min / r_earth_max."""
+    if mask is None:
+        mask = [False] * len(vals)
+    return MaskedColumn(vals, mask=mask, name='r_bound')
+
+
+def test_rocky_mask_in_range():
+    r = _r([1.0])
+    assert rocky_mask(r, None, None, lower=0.5, upper=1.5)[0]
+
+
+def test_rocky_mask_out_of_range():
+    r = _r([2.0])
+    assert not rocky_mask(r, None, None, lower=0.5, upper=1.5)[0]
+
+
+def test_rocky_mask_excludes_masked_r():
+    r = _r([1.0], mask=[True])
+    assert not rocky_mask(r, None, None, lower=0.5, upper=1.5)[0]
+
+
+def test_rocky_mask_interval_catches_uncertain():
+    # r_earth masked; rmin=1.1, rmax=1.4 → overlaps [0.5, 1.5]
+    r    = _r([0.0], mask=[True])
+    rmin = _rb([1.1])
+    rmax = _rb([1.4])
+    assert rocky_mask(r, rmin, rmax, lower=0.5, upper=1.5, use_interval=True)[0]
+
+
+def test_rocky_mask_interval_no_overlap():
+    # r_earth masked; rmin=2.0, rmax=3.0 → entirely outside [0.5, 1.5]
+    r    = _r([0.0], mask=[True])
+    rmin = _rb([2.0])
+    rmax = _rb([3.0])
+    assert not rocky_mask(r, rmin, rmax, lower=0.5, upper=1.5, use_interval=True)[0]
+
+
+def test_rocky_mask_no_bounds_falls_back():
+    # r_earth masked, no bounds → use_interval=True still False
+    r = _r([0.0], mask=[True])
+    assert not rocky_mask(r, None, None, lower=0.5, upper=1.5, use_interval=True)[0]
+
+
+def test_rocky_mask_interval_false_ignores_bounds():
+    # use_interval=False: even with rmin/rmax in range, masked r → False
+    r    = _r([0.0], mask=[True])
+    rmin = _rb([1.0])
+    rmax = _rb([1.3])
+    assert not rocky_mask(r, rmin, rmax, lower=0.5, upper=1.5, use_interval=False)[0]
+
+
+def test_rocky_mask_known_rocky_still_included_in_interval_mode():
+    # use_interval=True should also include confirmed rocky planets
+    r = _r([1.0])
+    assert rocky_mask(r, None, None, lower=0.5, upper=1.5, use_interval=True)[0]
 
 
 def test_temperate_mask_none_err_in_interval_mode():

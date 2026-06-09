@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from crossmatching.param_sources.base import StellarParamSource
 
 T_SUN = 5778.0  # K
+_M_JUP_TO_EARTH = u.M_jup.to(u.M_earth)  # ~317.83
 
 _TEFF_SPECTYPE = [
     (30000, 'O5'), (25000, 'O7'), (20000, 'O9'),
@@ -111,11 +112,77 @@ def temperate_mask(
     return valid & (flux.data - err2 <= upper) & (flux.data + err1 >= lower)
 
 
+def rocky_mask(
+    r_earth,
+    r_earth_min,
+    r_earth_max,
+    lower: float = 0.5,
+    upper: float = 1.5,
+    use_interval: bool = False,
+) -> np.ndarray:
+    """Boolean mask selecting rocky planets within [lower, upper] R_Earth.
+
+    Parameters
+    ----------
+    r_earth : array-like or MaskedColumn
+        Directly measured planet radii in R_Earth.
+    r_earth_min : array-like, MaskedColumn, or None
+        Lower bound on estimated radius from msini. Masked/NaN → no bound.
+    r_earth_max : array-like, MaskedColumn, or None
+        Upper bound on estimated radius from msini. Masked/NaN → no bound.
+    lower, upper : float
+        Radius bounds in R_Earth (inclusive, defaults: 0.5, 1.5).
+    use_interval : bool
+        False (default): only rows where r_earth is directly measured and in range.
+        True: also rows where r_earth is masked but [r_earth_min, r_earth_max]
+        overlaps [lower, upper] — i.e., the planet *could* be rocky.
+    """
+    r = np.ma.asarray(r_earth, dtype=float)
+    valid = ~np.ma.getmaskarray(r)
+
+    known_rocky = valid & (r.data >= lower) & (r.data <= upper)
+
+    if not use_interval:
+        return known_rocky
+
+    def _to_bound(arr):
+        if arr is None:
+            return np.full(len(r), np.nan)
+        a = np.ma.asarray(arr, dtype=float)
+        bad = np.ma.getmaskarray(a) | ~np.isfinite(a.data)
+        return np.where(bad, np.nan, a.data)
+
+    rmin = _to_bound(r_earth_min)
+    rmax = _to_bound(r_earth_max)
+    has_bounds = ~valid & np.isfinite(rmin) & np.isfinite(rmax)
+    uncertain_rocky = has_bounds & (rmin <= upper) & (rmax >= lower)
+
+    return known_rocky | uncertain_rocky
+
+
 def ms_radius_from_teff(teff: float) -> float:
     """Rough ZAMS Teff → radius (R/R_sun) for main-sequence fallback."""
     if not (teff > 0):
         return 0.0
     return max((teff / T_SUN) ** 1.8, 0.05)
+
+
+def mass_radius_chen_kipping(m_earth: float) -> float:
+    """Chen & Kipping (2017, ApJ 834 17) mass-radius relation in Earth units.
+
+    Piecewise power law — continuous at the Terran/Neptunian boundary (~2.04 M_Earth):
+      Terran   (M < 2.04):  R = 1.008 × M^0.279
+      Neptunian (2.04-132): R = 0.808 × M^0.589
+    Returns 0.0 for non-positive input.
+    """
+    if m_earth <= 0:
+        return 0.0
+    if m_earth < 2.04:
+        return 1.008 * m_earth ** 0.279
+    elif m_earth < 132.0:
+        return 0.808 * m_earth ** 0.589
+    else:
+        return 17.74 * m_earth ** (-0.044)
 
 
 def _col_float(table: Table, col: str):
@@ -141,8 +208,9 @@ class StellarParamMerger:
     statistics) is left to the caller.
     """
 
-    def __init__(self, sources: list[StellarParamSource]):
+    def __init__(self, sources: list[StellarParamSource], msini_sin_min: float = 0.5):
         self.sources = sources
+        self.msini_sin_min = msini_sin_min
 
     def enrich(self, table: Table) -> Table:
         """Return a copy of table with enriched columns added/replaced.
@@ -277,6 +345,22 @@ class StellarParamMerger:
         r_earth = MaskedColumn(r_vals * u.R_jup.to(u.R_earth), mask=~r_valid,
                                name='r_earth', description='Planet radius [R_earth]')
         r_earth_src = np.where(r_valid, 'emc', '')
+
+        # ── r_earth_min / r_earth_max (msini-based radius range) ─────────────
+        # Only populated for rows where no direct radius exists (r_valid=False).
+        # Inclination prior: isotropic → P(sin(i) > sin_min) = sqrt(1−sin_min²).
+        # Default sin_min=0.5 gives 86.6% CI upper bound on true mass.
+        # Ref: Chen & Kipping 2017 (ApJ 834 17); Stevens & Gaudi 2013 (PASP 125).
+        r_earth_min_arr = np.full(n, np.nan)
+        r_earth_max_arr = np.full(n, np.nan)
+        if 'msini' in table.colnames:
+            msini_vals, msini_mask_arr = _col_float(table, 'msini')
+            msini_earth = msini_vals * _M_JUP_TO_EARTH
+            msini_active = ~msini_mask_arr & (msini_earth > 0) & ~r_valid
+            for i in np.where(msini_active)[0]:
+                r_earth_min_arr[i] = mass_radius_chen_kipping(msini_earth[i])
+                r_earth_max_arr[i] = mass_radius_chen_kipping(
+                    msini_earth[i] / self.msini_sin_min)
 
         # ── st_lum ────────────────────────────────────────────────────────────
         lum_mask = rad_mask | teff_mask
@@ -421,6 +505,10 @@ class StellarParamMerger:
         result['st_lum_src']         = st_lum_src
         result['r_earth']            = r_earth
         result['r_earth_src']        = r_earth_src
+        result['r_earth_min']        = _mc(r_earth_min_arr, 'r_earth_min',
+                                           'Min estimated planet radius from msini [R_earth]')
+        result['r_earth_max']        = _mc(r_earth_max_arr, 'r_earth_max',
+                                           'Max estimated planet radius from msini [R_earth]')
         result['pl_eqt']             = MaskedColumn(pl_eqt, mask=pl_eqt_mask,  name='pl_eqt',
                                                     description='Planet equilibrium temperature [K]')
         result['pl_eqt_err1']        = _mc(pl_eqt_err1, 'pl_eqt_err1', 'Teq upper 1σ [K]')

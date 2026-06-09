@@ -1,18 +1,28 @@
 """Integration tests for StellarParamMerger with toy source tables and uncertainty propagation.
 
-Three planets exercise the full tier precedence:
+Four planets exercise the full tier precedence and msini radius estimation:
   Planet A — present in all three sources; HPIC wins for stellar params, NEA fills insol/mass
   Planet B — NEA only
   Planet C — SIMBAD only; rad derived from ms_radius_from_teff
+  Planet D — msini only, no direct radius; tests uncertain-rocky estimation
 """
 import numpy as np
 import pytest
+from astropy import units as u
 from astropy.table import MaskedColumn, Table
 
-from crossmatching.enrichment import StellarParamMerger, ms_radius_from_teff, temperate_mask
+from crossmatching.enrichment import (
+    StellarParamMerger,
+    mass_radius_chen_kipping,
+    ms_radius_from_teff,
+    rocky_mask,
+    temperate_mask,
+)
 from crossmatching.param_sources.hpic import HpicStellarParamSource
 from crossmatching.param_sources.nea import NeaStellarParamSource
 from crossmatching.param_sources.simbad import SimbadStellarParamSource
+
+_MSINI_D = 1.27 / u.M_jup.to(u.M_earth)  # 1.27 M_Earth expressed in M_Jup
 
 
 # ── toy data ──────────────────────────────────────────────────────────────────
@@ -72,14 +82,18 @@ def _simbad_table():
 
 
 def _catalog_table():
-    """Minimal EMC-shaped table with the 3 test planets."""
+    """Minimal EMC-shaped table with 4 test planets.
+
+    Planet D has no direct radius but has msini — exercises uncertain-rocky estimation.
+    """
     return Table({
-        "exo-mercat_name": ["Planet A", "Planet B", "Planet C"],
-        "nasa_name":       ["Planet A", "Planet B", "unknown"],
-        "main_id":         ["main_A",   "main_B",   "simbad_host_C"],
-        "r":               [0.1,        0.2,        0.08],   # Jupiter radii
-        "a":               [1.0,        0.0,        0.0],    # AU; B and C use Kepler/no a
-        "p":               [365.0,      30.0,       0.0],    # days
+        "exo-mercat_name": ["Planet A", "Planet B", "Planet C", "Planet D"],
+        "nasa_name":       ["Planet A", "Planet B", "unknown",  ""],
+        "main_id":         ["main_A",   "main_B",   "simbad_host_C", ""],
+        "r":               [0.1,        0.2,        0.08,       0.0],    # Jupiter radii; D absent
+        "a":               [1.0,        0.0,        0.0,        0.0485], # AU
+        "p":               [365.0,      30.0,       0.0,        11.186], # days
+        "msini":           [np.nan,     np.nan,     np.nan,     _MSINI_D],  # M_Jup; D only
     })
 
 
@@ -111,7 +125,7 @@ def test_all_enriched_columns_present(enriched):
     for col in (
         "st_teff", "st_rad", "st_mass", "sy_vmag", "sy_dist",
         "st_logg", "st_met", "st_lum", "pl_eqt",
-        "st_spectype", "r_earth", "flux_rel", "spectral_category",
+        "st_spectype", "r_earth", "r_earth_min", "r_earth_max", "flux_rel", "spectral_category",
         "st_teff_src", "st_rad_src", "st_mass_src", "sy_vmag_src", "sy_dist_src",
         "st_logg_src", "st_met_src", "st_lum_src", "pl_eqt_src",
         "r_earth_src", "a_src", "flux_rel_src",
@@ -384,3 +398,58 @@ def test_temperate_mask_interval_widens_selection(enriched):
     wide  = temperate_mask(flux, ferr1, ferr2, lower=0.25, upper=1.77, use_interval=True)
     # Interval mode can only add planets, never remove them
     assert np.all(tight <= wide)  # every True in tight is also True in wide
+
+
+# ── Planet D: msini only, no direct radius ────────────────────────────────────
+
+def test_planet_d_r_earth_masked(enriched):
+    row = _row(enriched, "Planet D")
+    assert np.ma.is_masked(row["r_earth"])
+
+
+def test_planet_d_r_earth_min_rocky(enriched):
+    # msini=1.27 M_Earth → r_min = mass_radius_chen_kipping(1.27) in rocky range
+    row = _row(enriched, "Planet D")
+    assert not np.ma.is_masked(row["r_earth_min"])
+    expected_min = mass_radius_chen_kipping(1.27)
+    assert float(row["r_earth_min"]) == pytest.approx(expected_min, rel=1e-4)
+    assert 0.5 < float(row["r_earth_min"]) < 1.5
+
+
+def test_planet_d_r_earth_max_rocky(enriched):
+    # m_max = 1.27/0.5 = 2.54 M_Earth (Neptunian) → r_max still in rocky range
+    row = _row(enriched, "Planet D")
+    assert not np.ma.is_masked(row["r_earth_max"])
+    expected_max = mass_radius_chen_kipping(1.27 / 0.5)
+    assert float(row["r_earth_max"]) == pytest.approx(expected_max, rel=1e-4)
+    assert 0.5 < float(row["r_earth_max"]) < 1.5
+
+
+def test_planet_abc_r_earth_min_masked(enriched):
+    # Planets with direct radius have r_earth_min/max masked
+    for name in ("Planet A", "Planet B", "Planet C"):
+        row = _row(enriched, name)
+        assert np.ma.is_masked(row["r_earth_min"]), f"{name} r_earth_min should be masked"
+        assert np.ma.is_masked(row["r_earth_max"]), f"{name} r_earth_max should be masked"
+
+
+# ── rocky_mask integration ─────────────────────────────────────────────────────
+
+def test_rocky_mask_planet_a_confirmed(enriched):
+    # Planet A: r=0.1 R_Jup ≈ 1.12 R_Earth → confirmed rocky
+    r = enriched["r_earth"]
+    rmin = enriched["r_earth_min"]
+    rmax = enriched["r_earth_max"]
+    mask = rocky_mask(r, rmin, rmax, lower=0.5, upper=1.5)
+    idx = list(enriched["exo-mercat_name"]).index("Planet A")
+    assert mask[idx]
+
+
+def test_rocky_mask_planet_d_uncertain_rocky(enriched):
+    # Planet D: no direct radius, but msini estimates put it in rocky range
+    r = enriched["r_earth"]
+    rmin = enriched["r_earth_min"]
+    rmax = enriched["r_earth_max"]
+    idx = list(enriched["exo-mercat_name"]).index("Planet D")
+    assert not rocky_mask(r, rmin, rmax, lower=0.5, upper=1.5)[idx]              # strict
+    assert rocky_mask(r, rmin, rmax, lower=0.5, upper=1.5, use_interval=True)[idx]  # uncertain
