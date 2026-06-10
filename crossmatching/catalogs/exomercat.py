@@ -1,5 +1,6 @@
 import numpy as np
 import pyvo
+import astropy.units as u
 from astropy.table import Table
 from typing import Literal
 
@@ -11,9 +12,14 @@ _DEFAULT_ALLOWED_STATUSES: list[StatusValue] = ["CONFIRMED", "CANDIDATE", "CONTR
 
 
 class EMCCatalog(CatalogBase):
-    """Exo-MerCat catalog from the Exo-MerCat TAP service."""
+    """
+    Exo-MerCat catalog from the Exo-MerCat TAP service or reads it from file.
+    Filters out entries marked as "FALSE POSITIVE" in the 'status' row from the raw catalogue
+    """
     ra_key = "main_id_ra"
+    ra_unit = u.degree
     dec_key = "main_id_dec"
+    ra_unit = u.degree
     host_key = "host"
     planet_uuid = "exo-mercat_name"
     pm_key = None

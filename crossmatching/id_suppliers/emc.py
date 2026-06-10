@@ -23,11 +23,11 @@ class EMCIdSupplier(IdSupplierBase):
         if id_str.startswith('*'):
             variants.append(id_str.lstrip('* '))
         if id_str.endswith("'s"):
-            variants.append(id_str.rstrip("'s "))
+            variants.append(id_str[:-2])
         if id_str.startswith("NAME "):
-            variants.append(id_str.lstrip("NAME "))
+            variants.append(id_str[5:])
         if id_str.startswith("Gaia DR"):
-            # SIMBAD stores "Gaia DR3 ..." but HPIC uses "GAIA DR3 ..."
+            # EMC stores "Gaia DR3 ..." but HPIC uses "GAIA DR3 ..."
             variants.append("GAIA" + id_str[4:])
         if id_str.startswith("TIC-") and id_str[4:].isdigit():
             # EMC stores "TIC-XXXXXXX" but HPIC uses "TIC XXXXXXX"

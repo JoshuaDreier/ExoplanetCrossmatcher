@@ -17,21 +17,54 @@ def allowed_angular_separation(
         proper_motion: ArrayLike,
         pm_err: ArrayLike,
         epoch: ArrayLike,
-        hpic_epoch: float = 2000,
+        input_epoch: float = 2000,
         minimum: u.Quantity = 10*u.arcsec,
         unknown_default: u.Quantity = 50*u.arcsec,
     ) -> u.Quantity:
-    """
-    inputs must be in arcsec/yr. epoch and proper_motion may be masked arrays.
-    Rows where epoch or proper_motion is masked (unknown) get unknown_default
-    instead of the computed value.
+    """Compute per-row coordinate search radii from proper-motion data.
+
+    The radius for row *i* grows with the proper-motion displacement
+    accumulated between the catalog coordinate epoch and the input survey
+    epoch::
+
+        radius_i = (pm_i + pm_err_i) * |epoch_i - hpic_epoch| + minimum
+
+    Rows where ``epoch`` or ``proper_motion`` is masked (unknown) receive
+    ``unknown_default`` instead of the computed value.
+
+    Parameters
+    ----------
+    proper_motion : array-like
+        Total proper motion in arcsec/yr.  May be a masked array;
+        masked rows are treated as unknown and receive
+        ``unknown_default``.
+    pm_err : array-like
+        Proper-motion uncertainty in arcsec/yr.  May be a masked array;
+        masked rows contribute 0 to the uncertainty term.
+    epoch : array-like
+        Coordinate epoch of the catalog positions (Julian year).  May
+        be a masked array; masked rows trigger ``unknown_default``.
+    input_epoch : float, optional
+        Epoch of the input survey positions (Julian year).  Default
+        2000 (HPIC LC4 reference epoch).
+    minimum : `~astropy.units.Quantity`, optional
+        Minimum search radius added to every computed value.
+        Default 10 arcsec.
+    unknown_default : `~astropy.units.Quantity`, optional
+        Search radius assigned to rows with unknown proper motion or
+        epoch.  Default 50 arcsec.
+
+    Returns
+    -------
+    radii : `~astropy.units.Quantity`
+        Per-row search radii in arcsec, shape matching the input arrays.
     """
     epoch_arr = np.ma.asarray(epoch)
     pm_arr = np.ma.asarray(proper_motion)
     pm_err_arr = np.ma.asarray(pm_err)
     unknown = np.ma.getmaskarray(epoch_arr) | np.ma.getmaskarray(pm_arr) | np.ma.getmaskarray(pm_err_arr)
 
-    dt = np.abs(np.ma.filled(epoch_arr, hpic_epoch) - hpic_epoch)
+    dt = np.abs(np.ma.filled(epoch_arr, input_epoch) - input_epoch)
     pm = np.ma.filled(pm_arr, 0.0)
     pmerr = np.ma.filled(np.ma.asarray(pm_err), 0.0)
 
@@ -52,10 +85,15 @@ class Crossmatcher:
 
     Parameters
     ----------
-    catalog : CatalogBase, optional
+    catalog : CatalogBase
         Catalog adapter providing schema and loading logic.
-    id_supplier : IdSupplierBase, optional
-        Alternate ID supplier. 
+        Availabe Catalogs: EMCCatalog (Exo-MerCat), NEACatalog (Nasa Exomplanet Archive), 
+        Custom Catalogs can be implemented by loading a file using FileCatalog or by
+        extending the CatalogBase class.
+    id_supplier : IdSupplierBase
+        supplier of the alisases used for ID crossmatching. 
+        Available ID suppliers: SimbadIDSupplier, EMCID
+        Custom ID suppliers can be implemented by extending the IdSupplierBase class.
     """
 
     def __init__(
@@ -89,19 +127,8 @@ class Crossmatcher:
         self.alternate_ids = table
         self._ids_for_names = frozenset(name_list)
 
-    def load_catalog(self, from_file=None, format="ascii", **kwargs) -> Table:
-        self._cache_catalog(self.catalog.load(from_file=from_file, format=format, **kwargs))
-        return self.catalog_table
-
-    def load_alternate_ids(self, name_list, from_file=None) -> Table:
-        self._cache_alternate_ids(
-            self.id_supplier.load_alternate_ids(name_list, from_file=from_file),
-            name_list,
-        )
-        return self.alternate_ids
-
-    def id_crossmatch(self, input_table: Table, input_starname_key: str):
-        name_list = input_table[input_starname_key].tolist()
+    def _ensure_alternate_ids(self, name_list: list[str]) -> None:
+        """Load or subset the alternate-ID cache to cover exactly name_list."""
         name_set = frozenset(name_list)
         if self.alternate_ids is None or not name_set <= self._ids_for_names:
             self.load_alternate_ids(name_list)
@@ -110,6 +137,83 @@ class Crossmatcher:
                 self.alternate_ids[np.isin(self.alternate_ids[self.id_supplier.input_col], name_list)],
                 name_list,
             )
+
+    def load_catalog(self, from_file: str | None = None, format: str = "ascii", **kwargs) -> Table:
+        """Download or read the planet catalog and cache it.
+
+        Parameters
+        ----------
+        from_file : str, optional
+            Path to a previously saved raw catalog file.  If given,
+            reads from disk; otherwise calls the catalog's
+            :meth:`~CatalogBase.download`.
+        format : str, optional
+            Astropy table format string (default ``'ascii'``).
+        **kwargs
+            Forwarded to :meth:`~CatalogBase.load`.
+
+        Returns
+        -------
+        table : `~astropy.table.Table`
+            Preprocessed catalog table, also stored as
+            ``self.catalog_table``.
+        """
+        self._cache_catalog(self.catalog.load(from_file=from_file, format=format, **kwargs))
+        return self.catalog_table
+
+    def load_alternate_ids(self, name_list: list[str], from_file: str | None = None) -> Table:
+        """Fetch or read alternate star identifiers and cache them.
+
+        Parameters
+        ----------
+        name_list : list of str
+            Input star names to load IDs for.
+        from_file : str, optional
+            Path to a previously saved alternate-ID file.  If given,
+            reads from disk; otherwise queries the ID supplier's remote
+            source.
+
+        Returns
+        -------
+        ids : `~astropy.table.Table`
+            Two-column table (``input_col``, ``id_col``), also stored
+            as ``self.alternate_ids``.
+        """
+        self._cache_alternate_ids(
+            self.id_supplier.load_alternate_ids(name_list, from_file=from_file),
+            name_list,
+        )
+        return self.alternate_ids
+
+    def id_crossmatch(self, input_table: Table, input_starname_key: str):
+        """Match input stars to the planet catalog by alternate identifier.
+
+        Fetches alternate IDs for all input stars (or uses the cached
+        set), then inner-joins the catalog on normalised host-star names.
+        Whitespace in all name columns is collapsed to single spaces
+        before joining, so that e.g. ``'Ross  128'`` (SIMBAD) matches
+        ``'Ross 128'`` (NEA).
+
+        Results are stored in ``self.id_matched`` and also returned.
+
+        Parameters
+        ----------
+        input_table : `~astropy.table.Table`
+            Stellar input table.  Must contain a column named
+            ``input_starname_key``.
+        input_starname_key : str
+            Name of the column in ``input_table`` that holds star names.
+
+        Returns
+        -------
+        matched : `~astropy.table.Table`
+            Inner-joined table of input rows × catalog planet rows.
+            Added column: ``match_type`` set to ``'id'`` for every row.
+            Columns present in both input and catalog (except the name
+            key) are suffixed with ``'_input'`` on the input side.
+        """
+        name_list = input_table[input_starname_key].tolist()
+        self._ensure_alternate_ids(name_list)
         if self.catalog_table is None:
             self.load_catalog()
 
@@ -136,7 +240,7 @@ class Crossmatcher:
 
         self.id_matched = input_table.to_pandas()
         self.id_matched[input_starname_key] = self.id_matched[input_starname_key].str.split().str.join(" ")
-        overlapping_columns = set(input_table.colnames) & set(self.catalog_table.colnames) - {input_starname_key}
+        overlapping_columns = (set(input_table.colnames) & set(self.catalog_table.colnames)) - {input_starname_key}
         if overlapping_columns:
             self.id_matched.rename(columns={c: f"{c}_{self.input_suffix}" for c in overlapping_columns}, inplace=True)
         self.id_matched = self.id_matched.merge(
@@ -169,16 +273,35 @@ class Crossmatcher:
         self.id_matched[input_starname_key] = self.id_matched[input_starname_key].astype(str)
         return self.id_matched
 
-    def find_duplicates(self, input_table: Table, input_starname_key: str, full=False) -> Table:
+    def find_duplicates(self, input_table: Table, input_starname_key: str, full: bool = False) -> Table:
+        """Find input stars that share alternate identifiers.
+
+        Performs a self-join on the alternate-ID table to identify groups
+        of input star names that share at least one common identifier
+        (i.e. refer to the same astronomical object).
+
+        Parameters
+        ----------
+        input_table : `~astropy.table.Table`
+            Stellar input table.  Must contain a column named
+            ``input_starname_key``.
+        input_starname_key : str
+            Name of the column in ``input_table`` that holds star names.
+        full : bool, optional
+            If ``False`` (default), return one representative row per
+            duplicate group.  If ``True``, return one row per member of
+            each group (groups with *n* members contribute *n* rows).
+
+        Returns
+        -------
+        duplicates : `~astropy.table.Table`
+            Table with columns ``input_col`` (star name),
+            ``duplicate_names`` (sorted list of all names sharing an ID),
+            and ``appearances`` (group size).  Empty if no duplicates
+            are found.
+        """
         name_list = input_table[input_starname_key].tolist()
-        name_set = frozenset(name_list)
-        if self.alternate_ids is None or not name_set <= self._ids_for_names:
-            self.load_alternate_ids(name_list)
-        elif name_set < self._ids_for_names:
-            self._cache_alternate_ids(
-                self.alternate_ids[np.isin(self.alternate_ids[self.id_supplier.input_col], name_list)],
-                name_list,
-            )
+        self._ensure_alternate_ids(name_list)
 
         input_col = self.id_supplier.input_col
         id_col_name = self.id_supplier.id_col
@@ -207,7 +330,36 @@ class Crossmatcher:
         return Table.from_pandas(grouped)
 
     def remove_duplicates(self, input_table: Table, input_starname_key: str) -> Table:
-        """Keep the row with the highest number of non-null values."""
+        """Remove duplicate input rows, keeping the most data-complete copy.
+
+        For each group of stars sharing an alternate identifier, retains
+        the row with the fewest null or sentinel values (``''``,
+        ``'null'``, ``'0'``, ``0``, ``None``).  Ties are broken by
+        keeping the first minimum.
+
+        Parameters
+        ----------
+        input_table : `~astropy.table.Table`
+            Stellar input table containing potential duplicate rows.
+        input_starname_key : str
+            Name of the column in ``input_table`` that holds star names.
+
+        Returns
+        -------
+        deduplicated : `~astropy.table.Table`
+            Copy of ``input_table`` with one row removed per duplicate
+            group (keeping the most complete entry).
+
+        Raises
+        ------
+        ValueError
+            If a name in a duplicate group does not appear exactly once
+            in ``input_table``.
+
+        Notes
+        -----
+        Prints the indices and names of removed rows to stdout.
+        """
         duplicates = self.find_duplicates(input_table, input_starname_key)
         drop_indices = []
         for dupe in duplicates:
@@ -218,21 +370,77 @@ class Crossmatcher:
                 if np.sum(arr) != 1:
                     raise ValueError(f"Expected exactly one match for each duplicate name, but found {np.sum(arr)} matches for {name}")
 
-            dupe_indeces = np.where(dupes_index_comparison_array)[1]
+            dupe_indices = np.where(dupes_index_comparison_array)[1]
             null_counts = [
                 np.isin(list(input_table[idx]), ["", 'null', '0', 0, None]).sum()
-                for idx in dupe_indeces
+                for idx in dupe_indices
             ]
 
             first_minimum_of_null = np.argmax(np.array(null_counts) == min(null_counts))
-            drop_indices.extend(idx for i, idx in enumerate(dupe_indeces) if i != first_minimum_of_null)
+            drop_indices.extend(idx for i, idx in enumerate(dupe_indices) if i != first_minimum_of_null)
 
-        print(f"Removed Rows with indecies and names: {', '.join(str(i) for i in drop_indices)}")
+        print(f"Removed Rows with indices and names: {', '.join(str(i) for i in drop_indices)}")
         copy = input_table.copy()
         copy.remove_rows(drop_indices)
         return copy
 
-    def coordinate_crossmatch(self, input_table: Table, input_starname_key: str, ra_key="ra", dec_key="dec") -> Table:
+    def coordinate_crossmatch(
+            self,
+            input_table: Table,
+            input_starname_key: str, 
+            ra_key: str = "ra", 
+            ra_unit: u.Quantity = u.degree,
+            dec_key: str = "dec",
+            dec_unit: u.Quantity = u.degree
+        ) -> Table:
+        """Match input stars to the planet catalog by 2D sky coordinates.
+
+        For each catalog planet host, finds the nearest input star within
+        a per-row angular search radius.  The radius grows with the
+        proper-motion displacement accumulated since the catalog's
+        coordinate epoch::
+
+            radius_i = (pm_i + pm_err_i) * |epoch_i - 2000| + coordinate_search_radius
+
+        Catalog proper-motion values (``pm_key``, ``pmerr_key``) are
+        converted from mas/yr to arcsec/yr (÷ 1000).  Rows with unknown
+        proper motion or epoch receive ``unknown_default`` = 50 arcsec.
+
+        Results are stored in ``self.coords2d_matched`` and also returned.
+
+        Parameters
+        ----------
+        input_table : `~astropy.table.Table`
+            Stellar input table.  Must contain ``ra_key`` and ``dec_key``
+            columns in degrees.
+        input_starname_key : str
+            Name of the column in ``input_table`` that holds star names.
+            Used only to detect and suffix overlapping column names.
+        ra_key : str, optional
+            Column name for right ascension in ``input_table`` (in units of ``ra_unit``).
+            Default ``'ra'``.
+        ra_unit : `u.Unit` 
+            Unit of ``ra_key`` column in ``input_table``
+            Defaults to degrees.
+        dec_key : str, optional
+            Column name for declination in ``input_table``.
+            Default ``'dec'``.
+        dec_unit : `u.Unit`
+            Unit of ``dec_key`` column in ``input_table``.
+            Defaults to degrees.
+
+        Returns
+        -------
+        matched : `~astropy.table.Table`
+            Horizontally stacked table of input rows × catalog planet
+            rows for all matches within the per-row radius.  Added
+            columns:
+
+            - ``match_type`` : ``'coordinates'`` for every row
+            - ``angular_separation`` : `~astropy.units.Quantity` (arcsec),
+              angular distance between the matched input and catalog
+              positions
+        """
         if self.catalog_table is None:
             self.load_catalog()
 
@@ -266,14 +474,20 @@ class Crossmatcher:
         cat_ra_key = self.catalog.ra_key
         cat_dec_key = self.catalog.dec_key
 
-        coords_input = SkyCoord(ra=input_table[ra_key]*u.deg, dec=input_table[dec_key]*u.deg)
-        coords_catalog = SkyCoord(ra=self.catalog_table[cat_ra_key]*u.deg, dec=self.catalog_table[cat_dec_key]*u.deg)
+        coords_input = SkyCoord(
+            ra=input_table[ra_key]*ra_unit,
+            dec=input_table[dec_key]*dec_unit
+        )
+        coords_catalog = SkyCoord(
+            ra=self.catalog_table[cat_ra_key]*self.catalog.ra_key,
+            dec=self.catalog_table[cat_dec_key]*self.catalog.dec_key
+        )
         idx2d, sep2d, _ = coords_catalog.match_to_catalog_sky(coords_input)
         sep2d_mask = sep2d <= per_row_radius_2d
 
         input_matched_slice = input_table[idx2d[sep2d_mask]].copy()
         overlapping_columns = list(
-            set(input_table.colnames) & set(self.catalog_table.colnames) - {input_starname_key}
+            (set(input_table.colnames) & set(self.catalog_table.colnames)) - {input_starname_key}
         )
         if overlapping_columns:
             input_matched_slice.rename_columns(
@@ -290,13 +504,40 @@ class Crossmatcher:
         return self.coords2d_matched
 
     def combined_crossmatch(self, input_table: Table, input_starname_key: str):
+        """Run ID and coordinate matching and merge the results.
+
+        Executes :meth:`id_crossmatch` first, then
+        :meth:`coordinate_crossmatch`.  Planets already found by ID
+        matching are removed from the coordinate results (deduplication
+        by ``planet_uuid``) before the two tables are stacked.  This
+        ensures each planet row appears at most once, with ID matches
+        taking priority. 
+        
+        Results are stored in ``self.matched`` and also returned.
+
+        Parameters
+        ----------
+        input_table : `~astropy.table.Table`
+            Stellar input table.  Must contain a column named
+            ``input_starname_key``, plus ``ra`` and ``dec`` columns in
+            degrees for the coordinate step.
+        input_starname_key : str
+            Name of the column in ``input_table`` that holds star names.
+
+        Returns
+        -------
+        matched : `~astropy.table.Table`
+            Combined table of all matched planet rows.  The
+            ``match_type`` column is ``'id'`` or ``'coordinates'``
+            indicating which method found each match. 
+        """
         uuid = self.planet_uuid
 
         id_results = self.id_crossmatch(input_table, input_starname_key)
         coord_results = self.coordinate_crossmatch(input_table, input_starname_key)
 
         only_coords = coord_results[
-            ~np.isin(coord_results[uuid].tolist(), id_results[uuid].tolist())
+            ~np.isin(coord_results[uuid], id_results[uuid])
         ]
 
         self.matched = astropy.table.vstack([id_results, only_coords], join_type="outer")

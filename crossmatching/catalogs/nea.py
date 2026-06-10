@@ -1,6 +1,7 @@
 import re
 import numpy as np
 import pyvo
+import astropy.units as u
 from astropy.table import Table, MaskedColumn
 
 from crossmatching.catalogs.base import CatalogBase
@@ -51,18 +52,85 @@ def _coord_epoch(reflink, gaia_dr3, gaia_dr2):
 
 
 class NEACatalog(CatalogBase):
+    """Catalog adapter for the NASA Exoplanet Archive Planetary Systems table.
+
+    Downloads the ``pscomppars`` composite-parameters table via TAP and
+    adds a ``coord_epoch`` column estimated from each row's Gaia cross-ID
+    and coordinate reference link.
+
+    Attributes
+    ----------
+    ra_key : str
+        ``'ra'`` right ascension column (mixed epochs)
+    ra_unit: u.Unit
+        right ascension unit, degrees, u.deg
+    dec_key : str
+        ``'dec'`` declination column (mixed epochs)
+    dec_unit: u.Unit
+        declination unit, degrees, u.deg
+    host_key : str
+        ``'hostname'`` — host-star name column (join key for ID matching).
+    planet_uuid : str
+        ``'pl_name'`` — unique planet-name column.
+    pm_key : str
+        ``'sy_pm'`` — total proper-motion column (mas/yr).
+    pmerr_key : str
+        ``'sy_pmerr1'`` — proper-motion uncertainty column (mas/yr).
+    """
+
     ra_key = "ra"
+    ra_unit = u.deg
     dec_key = "dec"
+    dec_unit = u.deg
     host_key = "hostname"
     planet_uuid = "pl_name"
     pm_key = "sy_pm"
     pmerr_key = "sy_pmerr1"
 
     def download(self) -> Table:
+        """Query the NASA Exoplanet Archive TAP and return the raw table.
+
+        Fetches ``SELECT * FROM pscomppars`` from the TAP endpoint at
+        ``exoplanetarchive.ipac.caltech.edu``.  Requires a network
+        connection; use :meth:`~CatalogBase.load` with ``from_file=``
+        for offline use.
+
+        Returns
+        -------
+        table : `~astropy.table.Table`
+            Raw ``pscomppars`` table with no preprocessing applied.
+        """
         nasa = pyvo.dal.TAPService("https://exoplanetarchive.ipac.caltech.edu/TAP")
         return nasa.run_sync("SELECT * FROM pscomppars").to_table()
 
     def preprocess(self, table: Table) -> Table:
+        """Add ``coord_epoch`` to the NASA Exoplanet Archive table.
+
+        Estimates the Julian-year epoch of each row's sky coordinates
+        using the following priority order:
+
+        1. Gaia DR3 or DR2 cross-ID present → 2016.0
+        2. ``ra_reflink`` mentions TICv8 / Stassun → 2000.0
+        3. ``ra_reflink`` mentions Hipparcos → 1991.25
+        4. ``ra_reflink`` publication year ≥ 2018 → 2016.0
+        5. ``ra_reflink`` publication year < 2018 → that year as float
+        6. None of the above → masked (coordinate matching falls back to
+           ``unknown_default`` = 50 arcsec [default, but configurable] for these rows)
+
+        Parameters
+        ----------
+        table : `~astropy.table.Table`
+            Raw table from :meth:`download` or :meth:`~CatalogBase.load_raw`.
+
+        Returns
+        -------
+        table : `~astropy.table.Table`
+            Input table with one additional column:
+
+            - ``coord_epoch`` : `~astropy.table.MaskedColumn` of float,
+              estimated coordinate epoch (Julian year).  Masked where
+              the epoch cannot be determined.
+        """
         epochs = [
             _coord_epoch(rl, dr3, dr2)
             for rl, dr3, dr2 in zip(
