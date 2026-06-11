@@ -18,7 +18,7 @@ def test_load_from_file():
 
 
 def test_no_pm_fallback_in_coordinate_crossmatch():
-    # EMCCatalog has pm_key=None — coordinate_crossmatch must fall back to
+    # if EMCCatalog has pm_key=None, then coordinate_crossmatch must fall back to
     # unknown_default (50 arcsec) for all rows without raising.
     cat = Table({
         "host": Column(["Test Host"]),

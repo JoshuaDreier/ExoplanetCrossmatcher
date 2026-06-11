@@ -479,8 +479,8 @@ class Crossmatcher:
             dec=input_table[dec_key]*dec_unit
         )
         coords_catalog = SkyCoord(
-            ra=self.catalog_table[cat_ra_key]*self.catalog.ra_key,
-            dec=self.catalog_table[cat_dec_key]*self.catalog.dec_key
+            ra=self.catalog_table[cat_ra_key]*self.catalog.ra_unit,
+            dec=self.catalog_table[cat_dec_key]*self.catalog.dec_unit
         )
         idx2d, sep2d, _ = coords_catalog.match_to_catalog_sky(coords_input)
         sep2d_mask = sep2d <= per_row_radius_2d
