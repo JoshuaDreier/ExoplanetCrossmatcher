@@ -1,10 +1,18 @@
 import pytest
+import astropy.units as u
 from astropy.table import Table
 
 from crossmatching.catalogs.file import FileCatalog
 
 
-KEYS = dict(ra_key="ra", dec_key="dec", host_key="hostname", planet_uuid="pl_name")
+KEYS = dict(
+    ra_key="ra",
+    ra_unit=u.degree,
+    dec_key="dec",
+    dec_unit=u.degree,
+    host_key="hostname", 
+    planet_uuid="pl_name"
+)
 
 
 @pytest.fixture
@@ -68,7 +76,9 @@ def test_file_catalog_accepts_custom_keys(simple_csv):
         simple_csv,
         format="ascii.csv",
         ra_key="ra",
+        ra_unit=u.degree,
         dec_key="dec",
+        dec_unit=u.degree,
         host_key="hostname",
         planet_uuid="pl_name",
     )

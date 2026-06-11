@@ -11,7 +11,7 @@ gt_ids, gt_row_params = get_guinea_tics_table_parametrization()
     gt_row_params,
     ids=[f"2d-af-xfail-{gt_id}" for gt_id in gt_ids],
 )
-def test_e2e_guinea_tics_coorinates_2d_all_found(stateless_matcher, star_name, ra, dec, planets_by_catalog):
+def test_e2e_guinea_tics_coordinates_2d_all_found(stateless_matcher, star_name, ra, dec, planets_by_catalog):
     planets = planets_by_catalog[stateless_matcher._expected_planets_col]
     _e2e_all_planets_found(star_name, ra, dec, planets, stateless_matcher, coordinate_crossmatch)
 

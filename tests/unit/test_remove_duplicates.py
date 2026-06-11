@@ -12,7 +12,7 @@ def test_remove_duplicates_reduces_row_count(cm_with_duplicates):
 
 
 def test_remove_duplicates_keeps_more_complete_row(cm_with_duplicates):
-    """Star B have an empty sy_dist (one extra null) so Star B should survive."""
+    """Star A has an empty sy_dist (one extra null), so Star B should survive."""
     input_table = Table({
         "star_name": ["Star A", "Star B", "Star C"],
         "sy_dist": ["", "1.0", "5.0"],

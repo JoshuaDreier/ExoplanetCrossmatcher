@@ -6,7 +6,7 @@ from pytest_check import check
 
 def test_load_catalog_has_required_columns():
     cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
-    cm.load_catalog(from_file="pscomppars.txt")
+    cm.load_catalog(from_file="tests/data/pscomppars_20260611.txt")
     for column_name in ["pl_name", "hostname", "ra", "dec", "sy_dist"]:
         check.is_in(column_name, cm.catalog_table.colnames)
 

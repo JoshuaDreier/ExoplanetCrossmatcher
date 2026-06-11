@@ -5,8 +5,8 @@ from astropy.table import Table
 from crossmatching import Crossmatcher, EMCCatalog, SimbadIdSupplier, EMCIdSupplier
 
 _EMC_FILE   = "exo-mercat.csv"
-_HPIC_FILE  = "input/HPIC_LC4_combined_d50.txt"
-_ALT_FILE   = "alternate_ids_hpic.txt"
+_HPIC_FILE  = "tests/data/HPIC_LC4_combined_d50_20260611.txt"
+_ALT_FILE   = "tests/data/alternate_ids_hpic_20260611.txt"
 _UUID       = "exo-mercat_name"
 
 _files_present = all(os.path.exists(f) for f in (_EMC_FILE, _HPIC_FILE, _ALT_FILE))
