@@ -3,7 +3,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 import pandas as pd
 from astropy.table import Table, MaskedColumn
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, angular_separation
 import astropy.units as u
 
 from crossmatching.catalogs.base import CatalogBase
@@ -185,7 +185,15 @@ class Crossmatcher:
         )
         return self.alternate_ids
 
-    def id_crossmatch(self, input_table: Table, input_starname_key: str):
+    def id_crossmatch(
+            self, 
+            input_table: Table, 
+            input_starname_key: str,
+            ra_key: str | None = None,
+            dec_key: str | None = None,
+            ra_unit: u.Unit = u.deg,
+            dec_unit: u.Unit = u.deg,
+        ):
         """Match input stars to the planet catalog by alternate identifier.
 
         Fetches alternate IDs for all input stars (or uses the cached
@@ -203,12 +211,32 @@ class Crossmatcher:
             ``input_starname_key``.
         input_starname_key : str
             Name of the column in ``input_table`` that holds star names.
+        ra_key : str or None, optional
+            Column name for right ascension in ``input_table``.  If
+            given (together with ``dec_key``), the on-sky angular
+            separation between each matched pair is computed and stored
+            in ``angular_sep_key``.  Default ``None`` (no separation
+            computed).
+        dec_key : str or None, optional
+            Column name for declination in ``input_table``.  See
+            ``ra_key``.  Default ``None``.
+        ra_unit : `~astropy.units.Unit`, optional
+            Unit of the ``ra_key`` column.  Default degrees.
+        dec_unit : `~astropy.units.Unit`, optional
+            Unit of the ``dec_key`` column.  Default degrees.
 
         Returns
         -------
         matched : `~astropy.table.Table`
             Inner-joined table of input rows × catalog planet rows.
-            Added column: ``match_type`` set to ``'id'`` for every row.
+            Added columns:
+
+            - ``match_type`` : ``'id'`` for every row.
+            - ``angular_separation`` : `~astropy.units.Quantity` (arcsec),
+              great-circle distance between the matched input and catalog
+              positions.  Present only when ``ra_key`` and ``dec_key``
+              are supplied.
+
             Columns present in both input and catalog (except the name
             key) are suffixed with ``'_input'`` on the input side.
         """
@@ -271,6 +299,20 @@ class Crossmatcher:
                 self.id_matched[colname] = np.char.strip(self.id_matched[colname])
 
         self.id_matched[input_starname_key] = self.id_matched[input_starname_key].astype(str)
+        
+        if ra_key is not None and dec_key is not None:
+            # id_crossmatch renames any input column that collides with a catalog column
+            # (e.g. "ra" → "ra_input").  Resolve the actual names before indexing.
+            input_ra_col  = f"{ra_key}_{self.input_suffix}"  if ra_key  in self.catalog_table.colnames else ra_key
+            input_dec_col = f"{dec_key}_{self.input_suffix}" if dec_key in self.catalog_table.colnames else dec_key
+
+            self.id_matched[self.angular_sep_key] = angular_separation(
+                self.id_matched[input_ra_col]*ra_unit,       
+                self.id_matched[input_dec_col]*dec_unit,      
+                self.id_matched[self.catalog.ra_key]*self.catalog.ra_unit,
+                self.id_matched[self.catalog.dec_key]*self.catalog.dec_unit,
+            ).to(u.arcsec)
+        
         return self.id_matched
 
     def find_duplicates(self, input_table: Table, input_starname_key: str, full: bool = False) -> Table:
@@ -403,7 +445,7 @@ class Crossmatcher:
             radius_i = (pm_i + pm_err_i) * |epoch_i - 2000| + coordinate_search_radius
 
         Catalog proper-motion values (``pm_key``, ``pmerr_key``) are
-        converted from mas/yr to arcsec/yr (÷ 1000).  Rows with unknown
+        converted to arcsec/yr using ``catalog.pm_unit``.  Rows with unknown
         proper motion or epoch receive ``unknown_default`` = 50 arcsec.
 
         Results are stored in ``self.coords2d_matched`` and also returned.
@@ -457,8 +499,8 @@ class Crossmatcher:
         pm_key = self.catalog.pm_key
         pmerr_key = self.catalog.pmerr_key
         if pm_key is not None and pmerr_key is not None:
-            pm = self.catalog_table[pm_key] / 1000
-            pmerr = self.catalog_table[pmerr_key] / 1000
+            pm = np.ma.asarray(self.catalog_table[pm_key])*self.catalog.pm_unit.to(u.arcsec / u.yr)
+            pmerr = np.ma.asarray(self.catalog_table[pmerr_key])*self.catalog.pm_unit.to(u.arcsec / u.yr)
         else:
             # No proper motion data — create all-masked arrays so unknown_default is used
             n = len(self.catalog_table)
@@ -483,7 +525,8 @@ class Crossmatcher:
             dec=self.catalog_table[cat_dec_key]*self.catalog.dec_unit
         )
         idx2d, sep2d, _ = coords_catalog.match_to_catalog_sky(coords_input)
-        sep2d_mask = sep2d <= per_row_radius_2d
+        sep2d = sep2d.to(u.arcsec)
+        sep2d_mask = (sep2d <= per_row_radius_2d)
 
         input_matched_slice = input_table[idx2d[sep2d_mask]].copy()
         overlapping_columns = list(
@@ -503,7 +546,15 @@ class Crossmatcher:
         self.coords2d_matched[self.angular_sep_key] = sep2d[sep2d_mask]
         return self.coords2d_matched
 
-    def combined_crossmatch(self, input_table: Table, input_starname_key: str):
+    def combined_crossmatch(
+            self,
+            input_table: Table,
+            input_starname_key: str,
+            ra_key: str = "ra",
+            ra_unit: u.Unit = u.degree,
+            dec_key: str = "dec",
+            dec_unit: u.Unit = u.degree,
+        ):
         """Run ID and coordinate matching and merge the results.
 
         Executes :meth:`id_crossmatch` first, then
@@ -511,30 +562,52 @@ class Crossmatcher:
         matching are removed from the coordinate results (deduplication
         by ``planet_uuid``) before the two tables are stacked.  This
         ensures each planet row appears at most once, with ID matches
-        taking priority. 
-        
+        taking priority.
+
         Results are stored in ``self.matched`` and also returned.
 
         Parameters
         ----------
         input_table : `~astropy.table.Table`
-            Stellar input table.  Must contain a column named
-            ``input_starname_key``, plus ``ra`` and ``dec`` columns in
-            degrees for the coordinate step.
+            Stellar input table.  Must contain ``ra_key`` and ``dec_key``
+            columns plus a column named ``input_starname_key``.
         input_starname_key : str
             Name of the column in ``input_table`` that holds star names.
+        ra_key : str, optional
+            Column name for right ascension in ``input_table``.
+            Default ``'ra'``.
+        ra_unit : `~astropy.units.Unit`, optional
+            Unit of the ``ra_key`` column.  Default degrees.
+        dec_key : str, optional
+            Column name for declination in ``input_table``.
+            Default ``'dec'``.
+        dec_unit : `~astropy.units.Unit`, optional
+            Unit of the ``dec_key`` column.  Default degrees.
 
         Returns
         -------
         matched : `~astropy.table.Table`
-            Combined table of all matched planet rows.  The
-            ``match_type`` column is ``'id'`` or ``'coordinates'``
-            indicating which method found each match. 
+            Combined table of all matched planet rows.  Added columns:
+
+            - ``match_type`` : ``'id'`` or ``'coordinates'``
+            - ``angular_separation`` : `~astropy.units.Quantity` (arcsec),
+              great-circle distance between the matched input and catalog
+              positions (present for both ID and coordinate matches).
         """
         uuid = self.planet_uuid
 
-        id_results = self.id_crossmatch(input_table, input_starname_key)
-        coord_results = self.coordinate_crossmatch(input_table, input_starname_key)
+        id_results = self.id_crossmatch(
+            input_table,
+            input_starname_key,
+            ra_key=ra_key,
+            ra_unit=ra_unit,
+            dec_key=dec_key,
+            dec_unit=dec_unit
+        )
+        coord_results = self.coordinate_crossmatch(
+            input_table, input_starname_key,
+            ra_key=ra_key, ra_unit=ra_unit, dec_key=dec_key, dec_unit=dec_unit,
+        )
 
         only_coords = coord_results[
             ~np.isin(coord_results[uuid], id_results[uuid])
