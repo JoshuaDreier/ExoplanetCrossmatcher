@@ -10,9 +10,10 @@ class SimbadIdSupplier(IdSupplierBase):
 
     Queries SIMBAD for all known identifiers of each input star via an
     uploaded-table TAP query, then expands the pipe-delimited ``ids``
-    column into individual (star, identifier) pairs.  Four variant forms
-    are generated per raw ID to bridge naming discrepancies between
-    SIMBAD and planet catalogs:
+    column into individual (star, identifier) pairs.  Variant forms are
+    generated per raw ID by the rules in
+    :meth:`IdSupplierBase.id_variants` to bridge naming discrepancies
+    between SIMBAD and planet catalogs:
 
     1. Strip leading ``*`` / ``**`` object-type prefixes
        (e.g. ``'* alf Cen'`` → ``'alf Cen'``)
@@ -20,56 +21,13 @@ class SimbadIdSupplier(IdSupplierBase):
        (e.g. ``"Barnard's"`` → ``'Barnard'``)
     3. Strip leading ``'NAME '`` prefix
        (e.g. ``'NAME Proxima Cen'`` → ``'Proxima Cen'``)
-    4. Drop trailing stellar component letter (space + A/B/C/S/N)
-       (e.g. ``'Kepler-1229 A'`` → ``'Kepler-1229'``)
+    4. Compound ``NAME`` + possessive
+       (``"NAME Barnard's"`` → ``'Barnard'`` via an explicit rule)
 
     The ``input_col``, ``id_col``, and ``null_sentinel`` values are
     inherited from :class:`IdSupplierBase` (``'input_ids'``, ``'id'``,
     ``'--'``).
     """
-
-    def _expand_id_with_variants(self, input_id, id_str):
-        """Return (input_id, variant) pairs for a single raw SIMBAD identifier.
-
-        Generates the original ID plus up to four additional variants to
-        bridge naming differences between SIMBAD and planet catalogs.
-        See class docstring for the full list of rules.
-
-        Parameters
-        ----------
-        input_id : str
-            The input star name this identifier belongs to.
-        id_str : str
-            A single identifier string from SIMBAD (may have leading/
-            trailing whitespace).
-
-        Returns
-        -------
-        pairs : list of (str, str)
-            List of ``(input_id, variant)`` tuples.  The first element
-            is always ``(input_id, id_str.strip())``.
-        """
-        id_str = id_str.strip()
-        variants = [id_str]
-
-        if id_str.startswith('*'):
-            # Strip SIMBAD object type prefix: * = Star, ** = Star in double system (binary)
-            # Per SIMBAD nomenclature, these prefixes appear in ~4800 IDs but NEA catalog doesn't use them
-            variants.append(id_str.lstrip('* '))
-        if id_str.endswith("'s"):
-            # SIMBAD sometimes includes possessive forms of star names (Barnard's), but not the non-possessive form
-            # we include the non-possessive form, because NEA uses it (Barnard b)
-            variants.append(id_str[:-2])
-        if id_str.startswith("NAME "):
-            # SIMBAD sometimes includes "NAME " in front of star names (e.g. NAME Proxima Cen)
-            # we include both versions
-            variants.append(id_str[5:])
-        if len(id_str) > 2 and id_str[-2] == ' ' and id_str[-1] in 'ABCSN':
-            # Some catalogs append a stellar component letter (e.g. 'Kepler-1229 A') while
-            # others use the bare host name ('Kepler-1229'); include both forms
-            variants.append(id_str[:-2])
-
-        return [(input_id, v) for v in variants]
 
     def download(self, name_list: list[str]) -> Table:
         """Query SIMBAD TAP for all alternate identifiers of the input stars.
@@ -88,10 +46,7 @@ class SimbadIdSupplier(IdSupplierBase):
         -------
         raw : `~astropy.table.Table`
             Two-column table: ``input_col`` (input name) and ``'ids'``
-            (pipe-delimited SIMBAD identifiers, or null senti        if len(id_str) > 2 and id_str[-2] == ' ' and id_str[-1] in 'ABCSN':
-            # Some catalogs append a stellar component letter (e.g. 'Kepler-1229 A') while
-            # others use the bare host name ('Kepler-1229'); include both forms
-            variants.append(id_str[:-2])nel when
+            (pipe-delimited SIMBAD identifiers, or null sentinel when
             no match is found).
         """
         simbad = pyvo.dal.TAPService("https://simbad.cds.unistra.fr/simbad/sim-tap")
@@ -135,9 +90,9 @@ class SimbadIdSupplier(IdSupplierBase):
         """Expand pipe-delimited SIMBAD IDs into one-row-per-identifier form.
 
         Iterates over the raw SIMBAD query result, splitting each
-        ``ids`` field on ``'|'`` and calling
-        :meth:`_expand_id_with_variants` on each token.  Empty strings
-        and null-sentinel entries (``'--'``) are discarded.
+        ``ids`` field on ``'|'`` and calling :meth:`id_variants` on
+        each token.  Empty strings and null-sentinel entries (``'--'``)
+        are discarded.
 
         Parameters
         ----------
@@ -161,7 +116,7 @@ class SimbadIdSupplier(IdSupplierBase):
                 stripped = id_str.strip()
                 if not stripped or stripped == self.null_sentinel:
                     continue
-                for _, variant_id in self._expand_id_with_variants(input_id, id_str):
+                for variant_id in self.id_variants(stripped):
                     input_ids.append(input_id)
                     all_ids.append(variant_id)
         return Table([input_ids, all_ids], names=[self.input_col, self.id_col], dtype=["str", "str"])

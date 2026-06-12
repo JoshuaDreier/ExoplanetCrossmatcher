@@ -89,7 +89,7 @@ def test_no_dist_err_when_plx_err_absent():
     assert "dist_err2" not in result
 
 
-def test_download_includes_plx_err_in_query(MockTAP=None):
+def test_download_includes_plx_err_in_query():
     with patch("crossmatching.param_sources.simbad.pyvo.dal.TAPService") as MockTAP:
         MockTAP.return_value.run_sync.return_value.to_table.return_value = _simbad_result()
         src = SimbadStellarParamSource()

@@ -33,19 +33,19 @@ class TestCoordEpoch:
 
 class TestNEACatalogLoad:
     def test_load_from_file_has_required_columns(self):
-        cat = NEACatalog().load(from_file="pscomppars.txt")
+        cat = NEACatalog().load(from_file="tests/data/pscomppars_20260611.txt")
         for col in ("hostname", "pl_name", "ra", "dec", "sy_pm", "sy_pmerr1"):
             assert col in cat.colnames
 
     def test_load_adds_coord_epoch_column(self):
-        cat = NEACatalog().load(from_file="pscomppars.txt")
+        cat = NEACatalog().load(from_file="tests/data/pscomppars_20260611.txt")
         assert "coord_epoch" in cat.colnames
 
     def test_coord_epoch_known_rows_have_plausible_value(self):
-        cat = NEACatalog().load(from_file="pscomppars.txt")
+        cat = NEACatalog().load(from_file="tests/data/pscomppars_20260611.txt")
         has_epoch = ~np.ma.getmaskarray(cat["coord_epoch"])
         assert float(cat["coord_epoch"][has_epoch][0]) in (1991.25, 2000.0, 2016.0)
 
     def test_load_raw_does_not_add_coord_epoch(self):
-        raw = NEACatalog().load_raw("pscomppars.txt")
+        raw = NEACatalog().load_raw("tests/data/pscomppars_20260611.txt")
         assert "coord_epoch" not in raw.colnames

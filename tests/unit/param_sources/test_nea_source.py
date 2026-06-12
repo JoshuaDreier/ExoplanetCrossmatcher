@@ -61,3 +61,21 @@ def test_zero_insol_not_included():
 
 def test_key_col_is_nasa_name():
     assert NeaStellarParamSource.key_col == "nasa_name"
+
+
+def test_st_lum_log10_converted_to_linear():
+    # pscomppars st_lum is log10(L/L_sun); negative (sub-solar) values are valid
+    src = NeaStellarParamSource()
+    src._lookup = src._build_lookup(Table({
+        "pl_name":    ["Dim b",  "Bright b"],
+        "st_lum":     [-2.8,     1.0],
+        "st_lumerr1": [np.nan,   0.05],
+        "st_lumerr2": [np.nan,  -0.05],
+    }))
+    dim = src.get(_emc_row("Dim b"))
+    assert dim["lum"] == pytest.approx(10 ** -2.8)
+    bright = src.get(_emc_row("Bright b"))
+    assert bright["lum"] == pytest.approx(10.0)
+    # dex errors are converted through the exponential, each side separately
+    assert bright["lum_err1"] == pytest.approx(10 ** 1.05 - 10.0)
+    assert bright["lum_err2"] == pytest.approx(10.0 - 10 ** 0.95)

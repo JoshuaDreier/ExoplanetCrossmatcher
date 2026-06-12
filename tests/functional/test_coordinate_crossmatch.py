@@ -1,3 +1,4 @@
+import astropy.units as u
 from astropy.table import Table
 from crossmatching import Crossmatcher, NEACatalog, SimbadIdSupplier
 from tests.functional.conftest import make_catalog
@@ -34,6 +35,21 @@ def test_2d_match_found():
 def test_2d_no_match_when_far():
     cm = _make_cm()
     result = cm.coordinate_crossmatch(_input(110.0, 30.0), "star_name")
+    assert len(result) == 0
+
+
+def test_unknown_search_radius_is_configurable():
+    """The synthetic catalog has masked pm/epoch, so every row uses the
+    unknown-default radius; a 30 arcsec offset matches at the default 50
+    arcsec but not with a 1 arcsec override."""
+    offset_30as = 30.0 / 3600.0
+
+    result = _make_cm().coordinate_crossmatch(_input(100.0, 20.0 + offset_30as), "star_name")
+    assert len(result) == 1
+
+    cm_tight = Crossmatcher(NEACatalog(), SimbadIdSupplier(), unknown_search_radius=1 * u.arcsec)
+    cm_tight._cache_catalog(make_catalog(_CATALOG_STAR))
+    result = cm_tight.coordinate_crossmatch(_input(100.0, 20.0 + offset_30as), "star_name")
     assert len(result) == 0
 
 

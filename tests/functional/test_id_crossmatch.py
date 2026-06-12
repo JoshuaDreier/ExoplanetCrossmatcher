@@ -79,6 +79,22 @@ def test_id_multiple_matches_no_index_mixup():
     assert matched["id-gamma"] == "Gamma b"
 
 
+def test_id_duplicate_alt_id_pairs_do_not_duplicate_planets():
+    """Variant expansion can emit the same (input, id) pair from different raw
+    IDs (e.g. 'NAME GJ 876' → 'GJ 876' next to a literal 'GJ 876' entry); the
+    join must not duplicate matched planet rows."""
+    cm = _make_cm(
+        catalog_rows=[
+            {"hostname": "GJ 876", "pl_name": "GJ 876 b"},
+            {"hostname": "GJ 876", "pl_name": "GJ 876 c"},
+        ],
+        alt_id_pairs=[("fake id", "GJ 876"), ("fake id", "GJ 876")],
+    )
+    input_table = Table({"star_name": ["fake id"]})
+    result = cm.id_crossmatch(input_table, "star_name")
+    assert sorted(result["pl_name"].tolist()) == ["GJ 876 b", "GJ 876 c"]
+
+
 def test_id_no_false_positives():
     cm = _make_cm(
         catalog_rows=[{

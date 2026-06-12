@@ -31,6 +31,55 @@ class IdSupplierBase:
     id_col:        str = _cfg["id_col"]
     null_sentinel: str = _cfg["null_sentinel"]
 
+    def id_variants(self, id_str: str) -> list[str]:
+        """Return the match forms of one identifier: itself plus variants.
+
+        Each rule bridges a known naming discrepancy between SIMBAD-style
+        identifiers and planet-catalog host names.  All rules are applied
+        to the original ``id_str`` only (single-step, not transitive).
+        The one cross-rule composition that is useful —
+        ``"NAME Barnard's"`` → ``"Barnard"`` — is generated explicitly
+        inside the ``NAME`` rule.
+
+        Identifiers differing by a trailing stellar component letter
+        (``GJ 86 B`` vs ``GJ 86``) are deliberately *not* bridged: on
+        current data this adds no matches for the nea-simbad and emc-emc
+        configs while attaching planets to the wrong binary component in
+        emc-simbad (see ``companion_mismatch.ipynb``).
+
+        Subclasses extend the list by overriding this method and calling
+        ``super().id_variants()``.
+
+        Parameters
+        ----------
+        id_str : str
+            A single identifier string (may have leading/trailing
+            whitespace).
+
+        Returns
+        -------
+        variants : list of str
+            Stripped, deduplicated, non-empty forms; the original
+            (stripped) ``id_str`` is always first.
+        """
+        id_str = id_str.strip()
+        variants = [id_str]
+        if id_str.startswith('*'):
+            # Strip SIMBAD object type prefix: * = Star, ** = Star in double system (binary)
+            # Per SIMBAD nomenclature, these prefixes appear in ~4800 IDs but planet catalogs don't use them
+            variants.append(id_str.lstrip('* '))
+        if id_str.startswith("NAME "):
+            # SIMBAD sometimes includes "NAME " in front of star names (e.g. NAME Proxima Cen)
+            variants.append(id_str[5:])
+        if id_str.endswith("'s"):
+            # SIMBAD sometimes includes possessive forms of star names (Barnard's), but not the
+            # non-possessive form; planet catalogs use the non-possessive form (Barnard b)
+            variants.append(id_str[:-2])
+            if id_str.startswith("NAME "):
+                # Compound: "NAME Barnard's" → "Barnard" (the one useful two-rule composition)
+                variants.append(id_str[5:-2])
+        return [v for v in dict.fromkeys(v.strip() for v in variants) if v]
+
     def download(self, name_list: list[str]) -> Table:
         """Query the remote source and return the raw Table."""
         raise NotImplementedError

@@ -16,11 +16,13 @@ class CatalogBase:
     Attributes
     ----------
     ra_key : str
-        Column name for right ascension (degrees) in the catalog table.
-    ra_unit : `u.Unit` 
-        Unit of ``ra_key`` column in ``input_table``
+        Column name for right ascension in the catalog table.
+    ra_unit : `~astropy.units.Unit`
+        Unit of the ``ra_key`` column.
     dec_key : str
-        Column name for declination (degrees) in the catalog table.
+        Column name for declination in the catalog table.
+    dec_unit : `~astropy.units.Unit`
+        Unit of the ``dec_key`` column.
     host_key : str
         Column name identifying the host-star name.  Used as the join
         key in ID-based crossmatching.
@@ -28,21 +30,25 @@ class CatalogBase:
         Column that uniquely identifies a planet row (e.g. ``'pl_name'``
         for the NASA Exoplanet Archive).
     pm_key : str or None
-        Total proper-motion column name (mas/yr), or ``None`` if the
-        catalog does not carry proper-motion data.
+        Total proper-motion column name, or ``None`` if the catalog does
+        not carry proper-motion data.
     pmerr_key : str or None
-        Proper-motion uncertainty column name (mas/yr), or ``None`` if
-        not available.
+        Proper-motion uncertainty column name, or ``None`` if not available.
+    pm_unit : `~astropy.units.Unit`
+        Astropy unit of the proper-motion columns.  Default ``u.mas/u.yr``.
+        Used to convert pm values to arcsec/yr for the coordinate search
+        radius calculation.
     """
 
     ra_key: str
     ra_unit: u.Unit
     dec_key: str
-    dec_key: u.Unit
+    dec_unit: u.Unit
     host_key: str
     planet_uuid: str
     pm_key: str | None
     pmerr_key: str | None
+    pm_unit: u.Unit = u.mas / u.yr
 
     def download(self) -> Table:
         """Query the remote data source and return the raw Table."""

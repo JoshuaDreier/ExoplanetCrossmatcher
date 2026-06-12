@@ -1,3 +1,5 @@
+import logging
+
 import astropy
 import numpy as np
 from numpy.typing import ArrayLike
@@ -7,10 +9,10 @@ from astropy.coordinates import SkyCoord, angular_separation
 import astropy.units as u
 
 from crossmatching.catalogs.base import CatalogBase
-from crossmatching.catalogs.nea import NEACatalog
 from crossmatching.id_suppliers.base import IdSupplierBase
-from crossmatching.id_suppliers.simbad import SimbadIdSupplier
 from crossmatching.config import crossmatcher as _cm_cfg
+
+logger = logging.getLogger(__name__)
 
 
 def allowed_angular_separation(
@@ -62,11 +64,13 @@ def allowed_angular_separation(
     epoch_arr = np.ma.asarray(epoch)
     pm_arr = np.ma.asarray(proper_motion)
     pm_err_arr = np.ma.asarray(pm_err)
-    unknown = np.ma.getmaskarray(epoch_arr) | np.ma.getmaskarray(pm_arr) | np.ma.getmaskarray(pm_err_arr)
+    # Only unknown epoch or proper motion triggers the fallback radius; a masked
+    # pm_err alone just contributes 0 to the uncertainty term.
+    unknown = np.ma.getmaskarray(epoch_arr) | np.ma.getmaskarray(pm_arr)
 
     dt = np.abs(np.ma.filled(epoch_arr, input_epoch) - input_epoch)
     pm = np.ma.filled(pm_arr, 0.0)
-    pmerr = np.ma.filled(np.ma.asarray(pm_err), 0.0)
+    pmerr = np.ma.filled(pm_err_arr, 0.0)
 
     computed = (pm + pmerr) * dt * u.arcsec + minimum
     return np.where(
@@ -80,20 +84,32 @@ class Crossmatcher:
     """
     Combines ID-based and coordinate-based crossmatching.
 
-    First matches objects by ID, then performs coordinate-based
-    matching on remaining unmatched sources.
+    :meth:`combined_crossmatch` runs ID matching and coordinate matching
+    over the *full* input table, then removes planets already found by
+    ID from the coordinate results (deduplication by ``planet_uuid``),
+    so ID matches take priority.
 
     Parameters
     ----------
     catalog : CatalogBase
         Catalog adapter providing schema and loading logic.
-        Availabe Catalogs: EMCCatalog (Exo-MerCat), NEACatalog (Nasa Exomplanet Archive), 
-        Custom Catalogs can be implemented by loading a file using FileCatalog or by
+        Available catalogs: EMCCatalog (Exo-MerCat), NEACatalog (NASA Exoplanet Archive).
+        Custom catalogs can be implemented by loading a file using FileCatalog or by
         extending the CatalogBase class.
     id_supplier : IdSupplierBase
-        supplier of the alisases used for ID crossmatching. 
-        Available ID suppliers: SimbadIDSupplier, EMCID
+        Supplier of the aliases used for ID crossmatching.
+        Available ID suppliers: SimbadIdSupplier, EMCIdSupplier.
         Custom ID suppliers can be implemented by extending the IdSupplierBase class.
+    coordinate_search_radius : `~astropy.units.Quantity`, optional
+        Base tolerance for coordinate matching; the per-row radius grows
+        with proper-motion displacement (see :func:`allowed_angular_separation`).
+        Default 10 arcsec.
+    unknown_search_radius : `~astropy.units.Quantity`, optional
+        Search radius used for catalog rows whose proper motion or
+        coordinate epoch is unknown.  Default 50 arcsec.
+    input_suffix : str, optional
+        Suffix appended to input-table column names that collide with
+        catalog column names in the matched output.  Default ``'input'``.
     """
 
     def __init__(
@@ -101,12 +117,14 @@ class Crossmatcher:
         catalog: CatalogBase,
         id_supplier: IdSupplierBase,
         coordinate_search_radius: u.Quantity = 10*u.arcsec,
+        unknown_search_radius: u.Quantity = 50*u.arcsec,
         input_suffix: str = "input",
         **kwargs
     ):
         self.catalog = catalog
         self.id_supplier = id_supplier
         self.coordinate_search_radius = coordinate_search_radius
+        self.unknown_search_radius = unknown_search_radius
         self.input_suffix = input_suffix
         self.match_type_key   = _cm_cfg["match_type_key"] if "match_type_key" not in kwargs else kwargs["match_type_key"]
         self.id_match_label   = _cm_cfg["id_match_label"] if "id_match_label" not in kwargs else kwargs["id_match_label"]
@@ -258,6 +276,10 @@ class Crossmatcher:
         alt_df = self.alternate_ids.to_pandas()
         alt_df[id_col]    = alt_df[id_col].str.split().str.join(" ")
         alt_df[input_col] = alt_df[input_col].str.split().str.join(" ")
+        # Variant expansion can emit the same (input, id) pair from different raw IDs
+        # (e.g. "NAME GJ 876" → "GJ 876" next to a literal "GJ 876" entry); without
+        # deduplication each such pair would duplicate every matched planet row.
+        alt_df = alt_df.drop_duplicates([input_col, id_col])
 
         catalog_projected_onto_ids = cat_df.merge(
             alt_df,
@@ -400,10 +422,11 @@ class Crossmatcher:
 
         Notes
         -----
-        Prints the indices and names of removed rows to stdout.
+        Logs the indices and names of removed rows at INFO level
+        (logger ``crossmatching.crossmatcher``).
         """
         duplicates = self.find_duplicates(input_table, input_starname_key)
-        drop_indices = []
+        removed = []
         for dupe in duplicates:
             dupe_names = dupe["duplicate_names"]
             dupes_index_comparison_array = np.array([input_table[input_starname_key].data == name for name in dupe_names])
@@ -419,9 +442,18 @@ class Crossmatcher:
             ]
 
             first_minimum_of_null = np.argmax(np.array(null_counts) == min(null_counts))
-            drop_indices.extend(idx for i, idx in enumerate(dupe_indices) if i != first_minimum_of_null)
+            removed.extend(
+                (idx, name)
+                for i, (idx, name) in enumerate(zip(dupe_indices, dupe_names))
+                if i != first_minimum_of_null
+            )
 
-        print(f"Removed Rows with indices and names: {', '.join(str(i) for i in drop_indices)}")
+        drop_indices = [idx for idx, _ in removed]
+        logger.info(
+            "Removed %d duplicate rows: %s",
+            len(removed),
+            ", ".join(f"{idx} ({name})" for idx, name in removed),
+        )
         copy = input_table.copy()
         copy.remove_rows(drop_indices)
         return copy
@@ -429,11 +461,11 @@ class Crossmatcher:
     def coordinate_crossmatch(
             self,
             input_table: Table,
-            input_starname_key: str, 
-            ra_key: str = "ra", 
-            ra_unit: u.Quantity = u.degree,
+            input_starname_key: str,
+            ra_key: str = "ra",
+            ra_unit: u.Unit = u.degree,
             dec_key: str = "dec",
-            dec_unit: u.Quantity = u.degree
+            dec_unit: u.Unit = u.degree
         ) -> Table:
         """Match input stars to the planet catalog by 2D sky coordinates.
 
@@ -446,9 +478,18 @@ class Crossmatcher:
 
         Catalog proper-motion values (``pm_key``, ``pmerr_key``) are
         converted to arcsec/yr using ``catalog.pm_unit``.  Rows with unknown
-        proper motion or epoch receive ``unknown_default`` = 50 arcsec.
+        proper motion or epoch receive ``unknown_search_radius``
+        (default 50 arcsec, set in the constructor).
 
         Results are stored in ``self.coords2d_matched`` and also returned.
+
+        Notes
+        -----
+        Each catalog planet is paired only with its single *nearest*
+        input star.  If an unrelated input star (a close interloper,
+        e.g. a binary companion or chance neighbour) lies closer to the
+        catalog position than the true counterpart, the planet is
+        matched to the interloper and the true counterpart cannot match.
 
         Parameters
         ----------
@@ -510,7 +551,8 @@ class Crossmatcher:
         per_row_radius_2d = allowed_angular_separation(
             pm, pmerr,
             epoch,
-            minimum=self.coordinate_search_radius
+            minimum=self.coordinate_search_radius,
+            unknown_default=self.unknown_search_radius,
         )
 
         cat_ra_key = self.catalog.ra_key

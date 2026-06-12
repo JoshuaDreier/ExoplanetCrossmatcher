@@ -15,19 +15,24 @@ class FileCatalog(CatalogBase):
     path : str
         Default path to the catalog file.
     ra_key : str
-        Column name for right ascension (degrees).
+        Column name for right ascension.
+    ra_unit : `~astropy.units.Unit`
+        Unit of the ``ra_key`` column.
     dec_key : str
-        Column name for declination (degrees).
+        Column name for declination.
+    dec_unit : `~astropy.units.Unit`
+        Unit of the ``dec_key`` column.
     host_key : str
         Column name for host-star names (join key for ID matching).
     planet_uuid : str
         Column that uniquely identifies each planet row.
     pm_key : str, optional
-        Column name for total proper motion (mas/yr).  ``None`` if the
-        file does not contain proper-motion data.
+        Column name for total proper motion.  ``None`` if the file does
+        not contain proper-motion data.
     pmerr_key : str, optional
-        Column name for proper-motion uncertainty (mas/yr).  ``None``
-        if not available.
+        Column name for proper-motion uncertainty.  ``None`` if not available.
+    pm_unit : `~astropy.units.Unit`, optional
+        Unit of the proper-motion columns.  Default ``u.mas/u.yr``.
     format : str, optional
         Astropy table format string for reading the file
         (default ``'ascii'``).
@@ -43,8 +48,9 @@ class FileCatalog(CatalogBase):
         dec_unit: u.Unit,
         host_key: str,
         planet_uuid: str,
-        pm_key: str = None,
-        pmerr_key: str = None,
+        pm_key: str | None = None,
+        pmerr_key: str | None = None,
+        pm_unit: u.Unit = u.mas / u.yr,
         format: str = "ascii",
     ):
         self.path = path
@@ -57,6 +63,7 @@ class FileCatalog(CatalogBase):
         self.planet_uuid = planet_uuid
         self.pm_key = pm_key
         self.pmerr_key = pmerr_key
+        self.pm_unit = pm_unit
 
     def download(self) -> Table:
         raise NotImplementedError("FileCatalog has no remote source. Use load_raw() directly.")

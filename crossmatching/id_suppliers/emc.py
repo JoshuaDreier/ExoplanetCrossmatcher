@@ -17,26 +17,17 @@ class EMCIdSupplier(IdSupplierBase):
     aliases_col = "main_id_aliases"
     host_col    = "host"
 
-    def _expand_id_with_variants(self, input_id, id_str):
+    def id_variants(self, id_str: str) -> list[str]:
+        """Shared rules from IdSupplierBase plus two HPIC-specific spellings."""
+        variants = super().id_variants(id_str)
         id_str = id_str.strip()
-        variants = [id_str]
-        if id_str.startswith('*'):
-            variants.append(id_str.lstrip('* '))
-        if id_str.endswith("'s"):
-            variants.append(id_str[:-2])
-        if id_str.startswith("NAME "):
-            variants.append(id_str[5:])
         if id_str.startswith("Gaia DR"):
             # EMC stores "Gaia DR3 ..." but HPIC uses "GAIA DR3 ..."
             variants.append("GAIA" + id_str[4:])
         if id_str.startswith("TIC-") and id_str[4:].isdigit():
             # EMC stores "TIC-XXXXXXX" but HPIC uses "TIC XXXXXXX"
             variants.append("TIC " + id_str[4:])
-        if len(id_str) > 2 and id_str[-2] == ' ' and id_str[-1] in 'ABCSN':
-            # Some catalogs append a stellar component letter (e.g. 'Kepler-1229 A') while
-            # others use the bare host name ('Kepler-1229'); include both forms
-            variants.append(id_str[:-2])
-        return [(input_id, v) for v in variants]
+        return variants
 
     def preprocess(self, raw: Table) -> Table:
         input_ids = []
@@ -55,7 +46,7 @@ class EMCIdSupplier(IdSupplierBase):
                 if not alias or alias == self.null_sentinel:
                     continue
                 # Alias variants become potential HPIC input names; host is the catalog key.
-                for _, variant in self._expand_id_with_variants(alias, alias):
+                for variant in self.id_variants(alias):
                     input_ids.append(variant)
                     all_ids.append(host)
         return Table([input_ids, all_ids], names=[self.input_col, self.id_col], dtype=["str", "str"])

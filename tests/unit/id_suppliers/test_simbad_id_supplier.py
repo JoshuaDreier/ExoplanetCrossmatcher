@@ -92,6 +92,17 @@ def test_file_expands_name_prefix(tmp_path):
     assert "Proxima Cen" in ids
 
 
+def test_file_name_possessive_compound_rule(tmp_path):
+    # A compound rule handles "NAME Barnard's" → "Barnard" directly, so all
+    # four forms must appear from a single expansion pass (no transitive chaining).
+    path = _raw_file(tmp_path, [("Star A", "NAME Barnard's")])
+    result = SimbadIdSupplier().load_alternate_ids(["Star A"], from_file=path)
+    ids = result["id"].tolist()
+    for expected in ("NAME Barnard's", "Barnard's", "NAME Barnard", "Barnard"):
+        assert expected in ids
+    assert len(ids) == len(set(ids)), "variant expansion must not emit duplicates"
+
+
 def test_file_excludes_empty_ids(tmp_path):
     # Trailing pipe produces an empty token after split; should be dropped
     path = _raw_file(tmp_path, [("Star A", "GJ 1|")])

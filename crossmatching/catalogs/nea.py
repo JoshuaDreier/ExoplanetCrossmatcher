@@ -73,9 +73,11 @@ class NEACatalog(CatalogBase):
     planet_uuid : str
         ``'pl_name'`` — unique planet-name column.
     pm_key : str
-        ``'sy_pm'`` — total proper-motion column (mas/yr).
+        ``'sy_pm'`` — total proper-motion column.
     pmerr_key : str
-        ``'sy_pmerr1'`` — proper-motion uncertainty column (mas/yr).
+        ``'sy_pmerr1'`` — proper-motion uncertainty column.
+    pm_unit : `~astropy.units.Unit`
+        ``u.mas/u.yr`` — unit of the proper-motion columns.
     """
 
     ra_key = "ra"
@@ -86,6 +88,7 @@ class NEACatalog(CatalogBase):
     planet_uuid = "pl_name"
     pm_key = "sy_pm"
     pmerr_key = "sy_pmerr1"
+    pm_unit = u.mas / u.yr
 
     def download(self) -> Table:
         """Query the NASA Exoplanet Archive TAP and return the raw table.
