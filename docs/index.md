@@ -1,0 +1,30 @@
+# Exoplanet Crossmatcher
+
+This is a Python library that identifies exoplanet host stars by matching an input stellar
+survey (with names and optionally coordinates) against exoplanet catalogs.  Two
+complementary strategies are used: 
+- identifier-based matching
+- sky-coordinate matching with proper-motion-aware search radii.  
+
+The results can
+be enriched with stellar and derived planetary parameters from multiple sources.
+
+## Navigation
+
+| Page | Contents |
+|------|----------|
+| [Getting Started](getting-started.md) | Installation, caching data files, first crossmatch in 10 lines |
+| [Architecture](architecture.md) | Package layout, crossmatch data flow, enrichment pipeline diagram |
+| [Crossmatching](crossmatching.md) | ID matching, coordinate matching, combined strategy, output columns |
+| [Enrichment](enrichment.md) | `StellarParamMerger`, parameter-source priority chain, derived columns |
+| [Catalogs](catalogs.md) | `NEACatalog`, `FileCatalog`, `EMCCatalog` — when to use each |
+| [ID Suppliers](id-suppliers.md) | `SimbadIdSupplier`, `EMCIdSupplier` — how alternate IDs are fetched |
+| [Configuration](configuration.md) | `crossmatching.cfg` keys and override patterns |
+| [Column Reference](column-reference.md) | Full schema for crossmatch and enrichment output tables |
+| [Testing](testing.md) | Test pyramid, guinea-tics gold standard, how to run |
+
+## External resources
+
+- [NASA Exoplanet Archive TAP](https://exoplanetarchive.ipac.caltech.edu/TAP) — `pscomppars` table
+- [SIMBAD TAP](https://simbad.cds.unistra.fr/simbad/sim-tap) — alternate identifiers
+- [Exo-MerCat](https://github.com/Exo-MerCat/Exo-MerCat) — alternative merged catalog
