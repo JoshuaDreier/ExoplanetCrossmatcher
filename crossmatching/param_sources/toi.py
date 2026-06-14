@@ -37,6 +37,8 @@ class ToiStellarParamSource(StellarParamSource):
                 ('dist',  'st_dist',  True, 'st_disterr1', 'st_disterr2'),
                 ('logg',  'st_logg',  True, 'st_loggerr1', 'st_loggerr2'),
             ]:
+                if col not in cols:
+                    continue
                 v = _safe_float(row[col], require_positive=positive)
                 if v is not None:
                     entry[field] = v

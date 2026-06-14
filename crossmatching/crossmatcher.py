@@ -19,7 +19,7 @@ def allowed_angular_separation(
         proper_motion: ArrayLike,
         pm_err: ArrayLike,
         epoch: ArrayLike,
-        input_epoch: float = 2000,
+        input_epoch: float | None = None,
         minimum: u.Quantity = 10*u.arcsec,
         unknown_default: u.Quantity = 50*u.arcsec,
     ) -> u.Quantity:
@@ -47,8 +47,7 @@ def allowed_angular_separation(
         Coordinate epoch of the catalog positions (Julian year).  May
         be a masked array; masked rows trigger ``unknown_default``.
     input_epoch : float, optional
-        Epoch of the input survey positions (Julian year).  Default
-        2000 (HPIC LC4 reference epoch).
+        Epoch of the input survey positions (Julian year). 
     minimum : `~astropy.units.Quantity`, optional
         Minimum search radius added to every computed value.
         Default 10 arcsec.
@@ -61,6 +60,9 @@ def allowed_angular_separation(
     radii : `~astropy.units.Quantity`
         Per-row search radii in arcsec, shape matching the input arrays.
     """
+    if input_epoch is None: 
+        return unknown_default
+
     epoch_arr = np.ma.asarray(epoch)
     pm_arr = np.ma.asarray(proper_motion)
     pm_err_arr = np.ma.asarray(pm_err)
@@ -116,15 +118,15 @@ class Crossmatcher:
         self,
         catalog: CatalogBase,
         id_supplier: IdSupplierBase,
-        coordinate_search_radius: u.Quantity = 10*u.arcsec,
-        unknown_search_radius: u.Quantity = 50*u.arcsec,
+        minimum_search_radius: u.Quantity = 10*u.arcsec,
+        default_search_radius: u.Quantity = 50*u.arcsec,
         input_suffix: str = "input",
         **kwargs
     ):
         self.catalog = catalog
         self.id_supplier = id_supplier
-        self.coordinate_search_radius = coordinate_search_radius
-        self.unknown_search_radius = unknown_search_radius
+        self.minimum_search_radius = minimum_search_radius
+        self.default_search_radius = default_search_radius
         self.input_suffix = input_suffix
         self.match_type_key   = _cm_cfg["match_type_key"] if "match_type_key" not in kwargs else kwargs["match_type_key"]
         self.id_match_label   = _cm_cfg["id_match_label"] if "id_match_label" not in kwargs else kwargs["id_match_label"]
@@ -462,6 +464,7 @@ class Crossmatcher:
             self,
             input_table: Table,
             input_starname_key: str,
+            input_epoch: float | None = None,
             ra_key: str = "ra",
             ra_unit: u.Unit = u.degree,
             dec_key: str = "dec",
@@ -474,7 +477,7 @@ class Crossmatcher:
         proper-motion displacement accumulated since the catalog's
         coordinate epoch::
 
-            radius_i = (pm_i + pm_err_i) * |epoch_i - 2000| + coordinate_search_radius
+            radius_i = (pm_i + pm_err_i) * |epoch_i - input_epoch| + coordinate_search_radius
 
         Catalog proper-motion values (``pm_key``, ``pmerr_key``) are
         converted to arcsec/yr using ``catalog.pm_unit``.  Rows with unknown
@@ -543,7 +546,7 @@ class Crossmatcher:
             pm = np.ma.asarray(self.catalog_table[pm_key])*self.catalog.pm_unit.to(u.arcsec / u.yr)
             pmerr = np.ma.asarray(self.catalog_table[pmerr_key])*self.catalog.pm_unit.to(u.arcsec / u.yr)
         else:
-            # No proper motion data — create all-masked arrays so unknown_default is used
+            # No proper motion data, create all-masked arrays so unknown_default is used
             n = len(self.catalog_table)
             pm = np.ma.MaskedArray(np.zeros(n), mask=np.ones(n, dtype=bool))
             pmerr = np.ma.MaskedArray(np.zeros(n), mask=np.ones(n, dtype=bool))
@@ -551,8 +554,9 @@ class Crossmatcher:
         per_row_radius_2d = allowed_angular_separation(
             pm, pmerr,
             epoch,
-            minimum=self.coordinate_search_radius,
-            unknown_default=self.unknown_search_radius,
+            minimum=self.minimum_search_radius,
+            unknown_default=self.default_search_radius,
+            input_epoch=input_epoch
         )
 
         cat_ra_key = self.catalog.ra_key
@@ -592,6 +596,7 @@ class Crossmatcher:
             self,
             input_table: Table,
             input_starname_key: str,
+            input_epoch: float | None = None,
             ra_key: str = "ra",
             ra_unit: u.Unit = u.degree,
             dec_key: str = "dec",
@@ -615,6 +620,9 @@ class Crossmatcher:
             columns plus a column named ``input_starname_key``.
         input_starname_key : str
             Name of the column in ``input_table`` that holds star names.
+        input_epoch : float, optional
+            Epoch of the coordinates of the ``input_table``,
+            used to adjust the search radius based on time difference and proper motion  
         ra_key : str, optional
             Column name for right ascension in ``input_table``.
             Default ``'ra'``.
@@ -647,8 +655,13 @@ class Crossmatcher:
             dec_unit=dec_unit
         )
         coord_results = self.coordinate_crossmatch(
-            input_table, input_starname_key,
-            ra_key=ra_key, ra_unit=ra_unit, dec_key=dec_key, dec_unit=dec_unit,
+            input_table, 
+            input_starname_key,
+            input_epoch=input_epoch,
+            ra_key=ra_key,
+            ra_unit=ra_unit,
+            dec_key=dec_key,
+            dec_unit=dec_unit, 
         )
 
         only_coords = coord_results[

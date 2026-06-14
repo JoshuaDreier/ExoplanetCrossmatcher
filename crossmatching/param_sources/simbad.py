@@ -9,7 +9,9 @@ class SimbadStellarParamSource(StellarParamSource):
 
     Queries basic + mesFe_h + allfluxes for a batch of main_id strings.
     Lookup key is the EMC 'main_id' column.
-    Provides: teff, spec, dist, vmag; rad is derived via ms_radius_from_teff.
+    Provides: teff, logg, met, spec, dist, vmag, kmag; rad is derived via ms_radius_from_teff.
+    Note: cached simbad_params.txt files without 'logg' or 'fe_h' columns are still
+    readable (missing fields are silently skipped). Re-download to get metallicity.
     """
 
     key_col = "main_id"
@@ -19,8 +21,9 @@ class SimbadStellarParamSource(StellarParamSource):
         simbad = pyvo.dal.TAPService("https://simbad.cds.unistra.fr/simbad/sim-tap")
         upload = Table({"main_id": list(key_list)})
         return simbad.run_sync(
-            """SELECT b.main_id, b.sp_type, b.plx_value, b.plx_err, AVG(f.teff) AS teff,
-                      MAX(fl.V) AS vmag
+            """SELECT b.main_id, b.sp_type, b.plx_value, b.plx_err,
+                      AVG(f.teff) AS teff, AVG(f.log_g) AS logg, AVG(f.fe_h) AS fe_h,
+                      MAX(fl.V) AS vmag, MAX(fl.K) AS kmag
                FROM TAP_UPLOAD.ids AS u
                JOIN basic AS b ON b.main_id = u.main_id
                LEFT JOIN mesFe_h   AS f  ON f.oidref = b.oid
@@ -56,6 +59,18 @@ class SimbadStellarParamSource(StellarParamSource):
                         entry['dist_err2'] = d_err
             if vmag is not None:
                 entry['vmag'] = vmag
+            if 'logg' in cols:
+                logg = _safe_float(row['logg'], require_positive=True)
+                if logg is not None:
+                    entry['logg'] = logg
+            if 'kmag' in cols:
+                kmag_v = _safe_float(row['kmag'])
+                if kmag_v is not None:
+                    entry['kmag'] = kmag_v
+            if 'fe_h' in cols:
+                fe_h = _safe_float(row['fe_h'])  # 0.0 is valid (solar), no require_positive
+                if fe_h is not None:
+                    entry['met'] = fe_h
             lookup[mid] = entry
         return lookup
 
