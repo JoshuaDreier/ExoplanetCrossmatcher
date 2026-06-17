@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from astropy.table import Table
 
-from crossmatching.param_sources.toi import ToiStellarParamSource
+from crossmatching.enrichment.param_sources.toi import ToiParamSource
 
 
 def _toi_table(*rows):
@@ -42,7 +42,7 @@ def _emc_row(toi_name):
 
 
 def test_returns_available_params():
-    src = ToiStellarParamSource()
+    src = ToiParamSource()
     _loaded(src, _toi_table({"toidisplay": "TOI-700.01", "st_teff": 3480.0, "st_rad": 0.42,
                               "st_dist": 31.1, "st_logg": 4.7, "pl_insol": 0.9, "pl_eqt": 268.0}))
     result = src.get(_emc_row("TOI-700.01"))
@@ -56,7 +56,7 @@ def test_returns_available_params():
 
 def test_dist_comes_from_st_dist_not_sy_dist():
     # TOI uses st_dist; ensure the mapper reads that column
-    src = ToiStellarParamSource()
+    src = ToiParamSource()
     _loaded(src, _toi_table({"toidisplay": "TOI-100.01", "st_teff": 5000.0, "st_dist": 55.0}))
     result = src.get(_emc_row("TOI-100.01"))
     assert result["dist"] == pytest.approx(55.0)
@@ -64,7 +64,7 @@ def test_dist_comes_from_st_dist_not_sy_dist():
 
 def test_no_spec_or_vmag_provided():
     # TOI has neither spectral type nor V-band magnitude
-    src = ToiStellarParamSource()
+    src = ToiParamSource()
     _loaded(src, _toi_table({"toidisplay": "TOI-200.01", "st_teff": 5200.0}))
     result = src.get(_emc_row("TOI-200.01"))
     assert "spec" not in result
@@ -73,29 +73,29 @@ def test_no_spec_or_vmag_provided():
 
 def test_zero_logg_not_included():
     # logg=0 is a sentinel (require_positive=True)
-    src = ToiStellarParamSource()
+    src = ToiParamSource()
     _loaded(src, _toi_table({"toidisplay": "TOI-300.01", "st_teff": 4800.0, "st_logg": 0.0}))
     result = src.get(_emc_row("TOI-300.01"))
     assert "logg" not in result
 
 
 def test_zero_pl_eqt_not_included():
-    src = ToiStellarParamSource()
+    src = ToiParamSource()
     _loaded(src, _toi_table({"toidisplay": "TOI-400.01", "st_teff": 4500.0, "pl_eqt": 0.0}))
     result = src.get(_emc_row("TOI-400.01"))
     assert "pl_eqt" not in result
 
 
 def test_returns_empty_for_unknown_toi():
-    src = ToiStellarParamSource()
+    src = ToiParamSource()
     _loaded(src, _toi_table({"toidisplay": "TOI-700.01", "st_teff": 3480.0}))
     assert src.get(_emc_row("TOI-9999.99")) == {}
 
 
-@patch("crossmatching.param_sources.toi.pyvo.dal.TAPService")
+@patch("crossmatching.enrichment.param_sources.toi.pyvo.dal.TAPService")
 def test_download_queries_toi_table(MockTAP):
     MockTAP.return_value.run_sync.return_value.to_table.return_value = _toi_table()
-    src = ToiStellarParamSource()
+    src = ToiParamSource()
     src.download()
     query = MockTAP.return_value.run_sync.call_args[0][0]
     assert "toi" in query.lower()
@@ -103,7 +103,7 @@ def test_download_queries_toi_table(MockTAP):
 
 def test_teff_err_asymmetric():
     # err1=+120 (upper), err2=-90 (lower) → stored as positive magnitudes
-    src = ToiStellarParamSource()
+    src = ToiParamSource()
     _loaded(src, _toi_table({"toidisplay": "TOI-500.01", "st_teff": 4800.0,
                               "st_tefferr1": 120.0, "st_tefferr2": -90.0}))
     result = src.get(_emc_row("TOI-500.01"))
@@ -113,7 +113,7 @@ def test_teff_err_asymmetric():
 
 def test_dist_err_uses_st_disterr_columns():
     # Verifies TOI-specific st_disterr1/2 (not sy_disterr) and asymmetric storage
-    src = ToiStellarParamSource()
+    src = ToiParamSource()
     _loaded(src, _toi_table({"toidisplay": "TOI-600.01", "st_teff": 5000.0,
                               "st_dist": 50.0, "st_disterr1": 2.0, "st_disterr2": -1.5}))
     result = src.get(_emc_row("TOI-600.01"))
@@ -122,7 +122,7 @@ def test_dist_err_uses_st_disterr_columns():
 
 
 def test_no_err_when_absent():
-    src = ToiStellarParamSource()
+    src = ToiParamSource()
     _loaded(src, _toi_table({"toidisplay": "TOI-700.02", "st_teff": 3480.0}))
     result = src.get(_emc_row("TOI-700.02"))
     assert "teff_err1" not in result

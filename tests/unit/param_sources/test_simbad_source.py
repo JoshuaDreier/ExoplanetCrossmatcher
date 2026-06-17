@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from astropy.table import Table
 
-from crossmatching.param_sources.simbad import SimbadStellarParamSource
+from crossmatching.enrichment.param_sources.simbad import SimbadParamSource
 
 
 def _simbad_result(*rows):
@@ -29,7 +29,7 @@ def _emc_row(mid):
 
 
 def test_returns_teff_and_spec():
-    src = SimbadStellarParamSource()
+    src = SimbadParamSource()
     _loaded(src, _simbad_result({"main_id": "Proxima", "teff": 3000.0, "sp_type": "M5.5V"}))
     result = src.get(_emc_row("Proxima"))
     assert result["teff"] == pytest.approx(3000.0)
@@ -38,30 +38,30 @@ def test_returns_teff_and_spec():
 
 
 def test_computes_dist_from_parallax():
-    src = SimbadStellarParamSource()
+    src = SimbadParamSource()
     _loaded(src, _simbad_result({"main_id": "Proxima", "teff": 3000.0, "plx_value": 769.0}))
     result = src.get(_emc_row("Proxima"))
     assert result["dist"] == pytest.approx(1000.0 / 769.0)
 
 
 def test_returns_empty_for_missing_main_id():
-    src = SimbadStellarParamSource()
+    src = SimbadParamSource()
     _loaded(src, _simbad_result({"main_id": "Proxima", "teff": 3000.0}))
     assert src.get(_emc_row("Unknown star")) == {}
 
 
 def test_zero_plx_not_converted_to_dist():
     # parallax=0 → infinite distance → should not be included
-    src = SimbadStellarParamSource()
+    src = SimbadParamSource()
     _loaded(src, _simbad_result({"main_id": "Star", "teff": 4000.0, "plx_value": 0.0}))
     result = src.get(_emc_row("Star"))
     assert "dist" not in result
 
 
-@patch("crossmatching.param_sources.simbad.pyvo.dal.TAPService")
+@patch("crossmatching.enrichment.param_sources.simbad.pyvo.dal.TAPService")
 def test_download_uploads_key_list(MockTAP):
     MockTAP.return_value.run_sync.return_value.to_table.return_value = _simbad_result()
-    src = SimbadStellarParamSource()
+    src = SimbadParamSource()
     src.download(["* Proxima Cen", "GJ 447"])
     call_kwargs = MockTAP.return_value.run_sync.call_args
     uploaded = call_kwargs[1]["uploads"]["ids"]
@@ -71,7 +71,7 @@ def test_download_uploads_key_list(MockTAP):
 def test_dist_err_from_parallax_error():
     # d = 1000/plx → σ_d = 1000 * σ_plx / plx²; symmetric → err1 == err2
     # plx=200 → d=5pc, plx_err=2 → dist_err = 1000*2/200² = 0.05 pc
-    src = SimbadStellarParamSource()
+    src = SimbadParamSource()
     _loaded(src, _simbad_result({"main_id": "Star", "teff": 4000.0,
                                   "plx_value": 200.0, "plx_err": 2.0}))
     result = src.get(_emc_row("Star"))
@@ -81,7 +81,7 @@ def test_dist_err_from_parallax_error():
 
 
 def test_no_dist_err_when_plx_err_absent():
-    src = SimbadStellarParamSource()
+    src = SimbadParamSource()
     _loaded(src, _simbad_result({"main_id": "Star2", "teff": 4000.0, "plx_value": 100.0}))
     result = src.get(_emc_row("Star2"))
     assert "dist" in result
@@ -90,9 +90,9 @@ def test_no_dist_err_when_plx_err_absent():
 
 
 def test_download_includes_plx_err_in_query():
-    with patch("crossmatching.param_sources.simbad.pyvo.dal.TAPService") as MockTAP:
+    with patch("crossmatching.enrichment.param_sources.simbad.pyvo.dal.TAPService") as MockTAP:
         MockTAP.return_value.run_sync.return_value.to_table.return_value = _simbad_result()
-        src = SimbadStellarParamSource()
+        src = SimbadParamSource()
         src.download(["Star"])
         query = MockTAP.return_value.run_sync.call_args[0][0]
         assert "plx_err" in query

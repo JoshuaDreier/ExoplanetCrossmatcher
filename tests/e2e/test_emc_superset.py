@@ -4,7 +4,7 @@ from astropy.table import Table
 
 from crossmatching import Crossmatcher, EMCCatalog, SimbadIdSupplier, EMCIdSupplier
 
-_EMC_FILE   = "exo-mercat.csv"
+_EMC_FILE   = "tests/data/exo-mercat2026-06-08.csv"
 _HPIC_FILE  = "tests/data/HPIC_LC4_combined_d50_20260611.txt"
 _ALT_FILE   = "tests/data/alternate_ids_hpic_20260611.txt"
 _UUID       = "exo-mercat_name"

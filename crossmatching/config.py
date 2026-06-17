@@ -10,8 +10,13 @@ _cfg.read_dict({
         "coord_match_label": "coordinates",
         "angular_sep_key": "angular_separation",
     },
+    "enrichment": {
+        "source_err_suffix": "err1",
+        "dependent_err_suffix": "err2",
+    },
 })
 _cfg.read(Path(__file__).parent / "crossmatching.cfg")
 
 id_supplier = _cfg["id_supplier"]
 crossmatcher = _cfg["crossmatcher"]
+enrichment = _cfg["enrichment"]

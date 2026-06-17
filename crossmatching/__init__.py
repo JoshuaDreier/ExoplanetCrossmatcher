@@ -7,16 +7,8 @@ from crossmatching.id_suppliers.base import IdSupplierBase
 from crossmatching.id_suppliers.simbad import SimbadIdSupplier
 from crossmatching.id_suppliers.emc import EMCIdSupplier
 from crossmatching.enrichment import (
-    StellarParamMerger,
+    ParamFiller,
     mass_radius_chen_kipping,
     rocky_mask,
     temperate_mask,
-)
-from crossmatching.param_sources import (
-    StellarParamSource,
-    HpicStellarParamSource,
-    NeaStellarParamSource,
-    SimbadStellarParamSource,
-    EpicStellarParamSource,
-    ToiStellarParamSource,
 )

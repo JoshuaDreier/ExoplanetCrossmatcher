@@ -47,7 +47,7 @@ def test_unknown_search_radius_is_configurable():
     result = _make_cm().coordinate_crossmatch(_input(100.0, 20.0 + offset_30as), "star_name")
     assert len(result) == 1
 
-    cm_tight = Crossmatcher(NEACatalog(), SimbadIdSupplier(), unknown_search_radius=1 * u.arcsec)
+    cm_tight = Crossmatcher(NEACatalog(), SimbadIdSupplier(), default_search_radius=1 * u.arcsec)
     cm_tight._cache_catalog(make_catalog(_CATALOG_STAR))
     result = cm_tight.coordinate_crossmatch(_input(100.0, 20.0 + offset_30as), "star_name")
     assert len(result) == 0

@@ -1,0 +1,7 @@
+from crossmatching.enrichment.param_sources.base import ParamSource
+from crossmatching.enrichment.param_sources.hpic import HpicParamSource
+from crossmatching.enrichment.param_sources.nea import NeaParamSource
+from crossmatching.enrichment.param_sources.simbad import SimbadParamSource
+from crossmatching.enrichment.param_sources.epic import EpicParamSource
+from crossmatching.enrichment.param_sources.toi import ToiParamSource
+from crossmatching.enrichment.param_sources.eu import EuParamSource

@@ -26,11 +26,11 @@ def id_crossmatch(crossmatcher: Crossmatcher, query_row):
     return crossmatcher.id_crossmatch(query_row, "star_name")
 
 def coordinate_crossmatch(crossmatcher: Crossmatcher, query_row):
-    return crossmatcher.coordinate_crossmatch(query_row, "star_name")
+    return crossmatcher.coordinate_crossmatch(query_row, "star_name", input_epoch=2000)
 
 def combined_crossmatch(crossmatcher: Crossmatcher, query_row):
     crossmatcher.load_alternate_ids(query_row["star_name"].tolist(), from_file=crossmatcher._alt_ids_file)
-    return crossmatcher.combined_crossmatch(query_row, "star_name")
+    return crossmatcher.combined_crossmatch(query_row, "star_name", input_epoch=2000)
 
 
 @pytest.fixture(scope="session", params=CONFIGS, ids=[c.label for c in CONFIGS])

@@ -25,6 +25,13 @@ class EMCCatalog(CatalogBase):
     pm_key = None
     pmerr_key = None
 
+    ENRICH_KEYS = {
+        "planet_radius_key": "r",
+        "semi_major_axis_key": "a",
+        "period_key": "p",
+        "msini_key": "msini",
+    }
+
     def __init__(self, allowed_statuses: list[StatusValue] | None = None):
         self.allowed_statuses = allowed_statuses if allowed_statuses is not None else _DEFAULT_ALLOWED_STATUSES
 

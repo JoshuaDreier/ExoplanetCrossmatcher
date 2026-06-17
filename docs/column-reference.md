@@ -2,49 +2,60 @@
 
 ## Crossmatch output
 
-`combined_crossmatch()` returns all columns from the planet catalog (passthrough)
-plus the columns listed below.  Columns that exist in both the input table and
-the catalog (other than the star-name key) are suffixed with `_input` on the
-input side.
+`combined_crossmatch()` returns all columns from the planet catalog (passthrough) plus the columns listed below.  Columns that exist in both the input table and the catalog (other than the star-name key) are suffixed with `_input` on the input side.
 
 ### Added columns
 
-| Column | Type | Match types | Description |
-|--------|------|-------------|-------------|
-| `match_type` | str | all | `'id'` — found via identifier match; `'coordinates'` — found by sky position |
-| `angular_separation` | Quantity (arcsec) | coordinates only | Angular distance between the matched input and catalog positions |
+| Column                             | Type              | Match types      | Description                                                                  |
+| ---------------------------------- | ----------------- | ---------------- | ---------------------------------------------------------------------------- |
+| `match_type`                       | str               | all              | `'id'` — found via identifier match; `'coordinates'` — found by sky position |
+| `crossmatching_angular_separation` | Quantity (arcsec) | coordinates only | Angular distance between the matched input and catalog positions             |
 
 ### NEA passthrough columns (selected)
 Note this is a summary `pscomppars` of the schema [NASA Exoplanet Archive column definitions](https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html)., retrieved on 2026-06-08. (These come directly from `pscomppars` and are not modified)
 
-| Column                          | Unit                    | Description                                             |
-| ------------------------------- | ----------------------- | ------------------------------------------------------- |
-| `pl_name`                       |                         | Unique planet name (planet UUID)                        |
-| `hostname`                      |                         | Host-star name as stored in NEA                         |
-| `ra`                            | deg                     | Right ascension                                         |
-| `dec`                           | deg                     | Declination                                             |
-| `ra_reflink`/<br>`dec_reflink`  |                         | Reference of publication used for the coordinates       |
-| `pl_rade`/ `pl_radj`            | Earth/Jupiter radius    | Radius of planet                                        |
-| `pl_masse`/`pl_massj`           | Earth/Jupiter mass      | Mass of planet                                          |
-| `pl_msinie`/`pl_msinij`         | Earth/Jupiter mass      | Minimum mass of a planet as measured by radial velocity |
-| `pl_insol`                      | Earth's insolation flux | Insolation flux on the planet                           |
-| `pl_eqt`                        | K                       | Planets equilibrium temperature                         |
-| `sy_pm`                         | mas/yr                  | Total proper motion                                     |
-| `sy_pmerr1`                     | mas/yr                  | Proper-motion upper uncertainty                         |
-| `st_teff`                       | K                       | Stellar effective temperature                           |
-| `st_rad`                        | R☉                      | Stellar radius                                          |
-| `st_mass`                       | M☉                      | Stellar mass                                            |
-| `sy_dist`                       | pc                      | Distance                                                |
-| `sy_vmag`                       | mag                     | Visual magnitude                                        |
-| `gaia_dr2_id`/<br>`gaia_dr3_id` |                         | Name of the star as given by the Gaia DR2/3 Catalog     |
+| Column                          | Unit                    | Description                                                                                         |
+| ------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------- |
+| `pl_name`                       |                         | Planet name "most commonly used in the literature"                                                  |
+| `hostname`                      |                         | Host-star name                                                                                      |
+| `pl_name`                       |                         | Letter assigned to the planetary component of a planetary system                                    |
+| `ra`                            | deg                     | Right ascension                                                                                     |
+| `dec`                           | deg                     | Declination                                                                                         |
+| `ra_reflink`/<br>`dec_reflink`  |                         | Reference of publication used for the coordinates (used to estimate epoch in this package)          |
+| `sy_pm`                         | mas/yr                  | Total proper motion (used in this package for controlling search radius)                            |
+| `sy_pmerr1`/`sy_pmerr2`         | mas/yr                  | Proper-motion upper/lower uncertainty (upper is used in this package for controlling search radius) |
+| `pl_rade`/ `pl_radj`            | Earth/Jupiter radius    | Radius of planet                                                                                    |
+| `pl_masse`/`pl_massj`           | Earth/Jupiter mass      | Mass of planet                                                                                      |
+| `pl_msinie`/`pl_msinij`         | Earth/Jupiter mass      | Minimum mass of a planet as measured by radial velocity                                             |
+| `pl_insol`                      | Earth's insolation flux | Insolation flux on the planet                                                                       |
+| `pl_orbsmax`                    | AU                      | Semi-Major axis of planet orbit                                                                     |
+| `pl_orbper`                     | days                    | Planet's orbital period                                                                             |
+| `pl_orbeccen`                   |                         | Planet's orital eccentricity                                                                        |
+| `pl_orbincl`                    | degree                  | Planet's orbital inclinatio                                                                         |
+| `pl_eqt`                        | K                       | Planets equilibrium temperature                                                                     |
+| `pl_dens`                       | g/cm³                   | Planet density                                                                                      |
+| `st_spectype`                   |                         | Spectral type of host star                                                                          |
+| `st_teff`                       | K                       | Stellar effective temperature                                                                       |
+| `st_rad`                        | R☉                      | Stellar radius                                                                                      |
+| `st_mass`                       | M☉                      | Stellar mass                                                                                        |
+| `st_lum`                        | log10(L☉)               | (log of) Stellar luminosity                                                                         |
+| `st_logg`                       | log10(cm/s²)            | Gravitational acceleration at the stellar surface                                                   |
+| `st_age`                        | Gyr                     | Age of the host star                                                                                |
+| `sy_dist`                       | pc                      | Distance                                                                                            |
+| `sy_vmag`                       | mag                     | Visual magnitude                                                                                    |
+| `sy_snum`/`sy_pnum`/`sy_mnum`   |                         | Number of (gravitationally bound) stars/planets/moons in the system                                 |
+| `cb_flag`                       |                         | Circumbinary Flag                                                                                   |
+| `gaia_dr2_id`/<br>`gaia_dr3_id` |                         | Name of the star as given by the Gaia DR2/3 Catalog                                                 |
+| `hip_name`                      |                         | Name of the star as given by the Hipparcos catalog                                                  |
+| `tic_id`                        |                         | Name of the star as given by the TESS input catalog                                                 |
 This packages implementation also computes  `coord_epoch` (Estimated coordinate epoch) in `NEACatalog.preprocess`, based on `ra_reflink`and  
 Note each "physical quantity" also has rows with that quantity's column name suffixed with `_err1, _err2`describing the upper and lower error on those properties and a `_reflink` suffix column giving the source for that measurement (including if it's calculated by the archive)
 
 
 ### Exo-MerCat passthrough columns
-(taken directly from [Exo-MerCat Documentation](https://exo-mercat.readthedocs.io/en/latest/table_headers.html), on 2026-06-08 and slightly altered (Note column))
+(taken directly from [Exo-MerCat Documentation](https://exo-mercat.readthedocs.io/en/latest/table_headers.html), on 2026-06-08 and slightly altered (Note column)) 
 
-| Column headers                    | Meaning                                                                                                                                                                                          | Type    | Noet                                                                                                                                                      |
+| Column headers                    | Meaning                                                                                                                                                                                          | Type    | Note                                                                                                                                                      |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `exomercat_name`                  | Planet name chosen by Exo-MerCat                                                                                                                                                                 | `str`   |                                                                                                                                                           |
 | `nasa_name`                       | Planet name in the NASA Exoplanet Archive                                                                                                                                                        | `str`   |                                                                                                                                                           |

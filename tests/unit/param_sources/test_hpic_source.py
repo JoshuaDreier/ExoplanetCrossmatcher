@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from astropy.table import MaskedColumn, Table
 
-from crossmatching.param_sources.hpic import HpicStellarParamSource
+from crossmatching.enrichment.param_sources.hpic import HpicParamSource
 
 
 def _crossmatch_table(*rows):
@@ -22,7 +22,7 @@ def _crossmatch_table(*rows):
 
 
 def _loaded_source(*rows):
-    src = HpicStellarParamSource(_crossmatch_table(*rows))
+    src = HpicParamSource(_crossmatch_table(*rows))
     src.load()
     return src
 
@@ -60,7 +60,7 @@ def test_zero_rad_not_included():
 
 def test_first_occurrence_wins_on_duplicate_name():
     # Two rows with the same exo-mercat_name — first should be used
-    src = HpicStellarParamSource(_crossmatch_table(
+    src = HpicParamSource(_crossmatch_table(
         {"name": "Dup b", "st_teff": 4000.0, "st_rad": 0.7},
         {"name": "Dup b", "st_teff": 9999.0, "st_rad": 9.9},
     ))
@@ -69,6 +69,6 @@ def test_first_occurrence_wins_on_duplicate_name():
 
 
 def test_download_raises():
-    src = HpicStellarParamSource(_crossmatch_table({"name": "X b"}))
+    src = HpicParamSource(_crossmatch_table({"name": "X b"}))
     with pytest.raises(NotImplementedError):
         src.download([])

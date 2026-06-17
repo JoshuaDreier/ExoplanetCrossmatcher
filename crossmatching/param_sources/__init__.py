@@ -1,6 +1,0 @@
-from crossmatching.param_sources.base import StellarParamSource
-from crossmatching.param_sources.hpic import HpicStellarParamSource
-from crossmatching.param_sources.nea import NeaStellarParamSource
-from crossmatching.param_sources.simbad import SimbadStellarParamSource
-from crossmatching.param_sources.epic import EpicStellarParamSource
-from crossmatching.param_sources.toi import ToiStellarParamSource

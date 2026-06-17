@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from astropy.table import Table
 
-from crossmatching.param_sources.epic import EpicStellarParamSource
+from crossmatching.enrichment.param_sources.epic import EpicParamSource
 
 
 def _epic_table(*rows):
@@ -52,7 +52,7 @@ def _emc_row(epic_name):
 
 
 def test_returns_standard_params():
-    src = EpicStellarParamSource()
+    src = EpicParamSource()
     _loaded(src, _epic_table({"pl_name": "K2-1 b", "st_teff": 4800.0, "st_rad": 0.7,
                                "st_mass": 0.8, "pl_insol": 0.9, "sy_vmag": 10.1,
                                "sy_dist": 80.0, "st_spectype": "K5V"}))
@@ -67,7 +67,7 @@ def test_returns_standard_params():
 
 
 def test_returns_logg_met_pl_eqt():
-    src = EpicStellarParamSource()
+    src = EpicParamSource()
     _loaded(src, _epic_table({"pl_name": "K2-2 b", "st_teff": 5000.0,
                                "st_logg": 4.5, "st_met": -0.2, "pl_eqt": 350.0}))
     result = src.get(_emc_row("K2-2 b"))
@@ -78,7 +78,7 @@ def test_returns_logg_met_pl_eqt():
 
 def test_solar_metallicity_zero_is_included():
     # met=0.0 means [Fe/H]=0 (solar), not "missing data" — must be included
-    src = EpicStellarParamSource()
+    src = EpicParamSource()
     _loaded(src, _epic_table({"pl_name": "K2-3 b", "st_teff": 5778.0, "st_met": 0.0}))
     result = src.get(_emc_row("K2-3 b"))
     assert "met" in result
@@ -86,7 +86,7 @@ def test_solar_metallicity_zero_is_included():
 
 
 def test_nan_metallicity_not_included():
-    src = EpicStellarParamSource()
+    src = EpicParamSource()
     _loaded(src, _epic_table({"pl_name": "K2-4 b", "st_teff": 5000.0}))  # st_met defaults to nan
     result = src.get(_emc_row("K2-4 b"))
     assert "met" not in result
@@ -94,20 +94,20 @@ def test_nan_metallicity_not_included():
 
 def test_zero_pl_eqt_not_included():
     # pl_eqt=0 is a sentinel (require_positive=True), not a real temperature
-    src = EpicStellarParamSource()
+    src = EpicParamSource()
     _loaded(src, _epic_table({"pl_name": "K2-5 b", "st_teff": 4500.0, "pl_eqt": 0.0}))
     result = src.get(_emc_row("K2-5 b"))
     assert "pl_eqt" not in result
 
 
 def test_returns_empty_for_unknown_name():
-    src = EpicStellarParamSource()
+    src = EpicParamSource()
     _loaded(src, _epic_table({"pl_name": "K2-1 b", "st_teff": 4800.0}))
     assert src.get(_emc_row("K2-999 z")) == {}
 
 
 def test_first_occurrence_wins_on_duplicate():
-    src = EpicStellarParamSource()
+    src = EpicParamSource()
     _loaded(src, _epic_table(
         {"pl_name": "K2-6 b", "st_teff": 4000.0},
         {"pl_name": "K2-6 b", "st_teff": 9999.0},
@@ -115,10 +115,10 @@ def test_first_occurrence_wins_on_duplicate():
     assert src.get(_emc_row("K2-6 b"))["teff"] == pytest.approx(4000.0)
 
 
-@patch("crossmatching.param_sources.epic.pyvo.dal.TAPService")
+@patch("crossmatching.enrichment.param_sources.epic.pyvo.dal.TAPService")
 def test_download_queries_k2pandc(MockTAP):
     MockTAP.return_value.run_sync.return_value.to_table.return_value = _epic_table()
-    src = EpicStellarParamSource()
+    src = EpicParamSource()
     src.download()
     query = MockTAP.return_value.run_sync.call_args[0][0]
     assert "k2pandc" in query.lower()
@@ -126,7 +126,7 @@ def test_download_queries_k2pandc(MockTAP):
 
 def test_asymmetric_errors_returned_separately():
     # err1=+100 (upper), err2=-80 (lower) → stored as positive magnitudes
-    src = EpicStellarParamSource()
+    src = EpicParamSource()
     _loaded(src, _epic_table({"pl_name": "K2-7 b", "st_teff": 5000.0,
                                "st_tefferr1": 100.0, "st_tefferr2": -80.0}))
     result = src.get(_emc_row("K2-7 b"))
@@ -136,7 +136,7 @@ def test_asymmetric_errors_returned_separately():
 
 def test_no_err_when_both_absent():
     # No error columns provided → no *_err1/*_err2 keys
-    src = EpicStellarParamSource()
+    src = EpicParamSource()
     _loaded(src, _epic_table({"pl_name": "K2-8 b", "st_teff": 5000.0}))
     result = src.get(_emc_row("K2-8 b"))
     assert "teff_err1" not in result
@@ -144,7 +144,7 @@ def test_no_err_when_both_absent():
 
 
 def test_rad_err_returned_asymmetric():
-    src = EpicStellarParamSource()
+    src = EpicParamSource()
     _loaded(src, _epic_table({"pl_name": "K2-9 b", "st_teff": 5000.0, "st_rad": 1.0,
                                "st_raderr1": 0.05, "st_raderr2": -0.04}))
     result = src.get(_emc_row("K2-9 b"))
@@ -154,7 +154,7 @@ def test_rad_err_returned_asymmetric():
 
 def test_met_err_zero_base_still_returns_err():
     # met=0.0 is solar, should still get its error
-    src = EpicStellarParamSource()
+    src = EpicParamSource()
     _loaded(src, _epic_table({"pl_name": "K2-10 b", "st_teff": 5778.0, "st_met": 0.0,
                                "st_meterr1": 0.05, "st_meterr2": -0.05}))
     result = src.get(_emc_row("K2-10 b"))

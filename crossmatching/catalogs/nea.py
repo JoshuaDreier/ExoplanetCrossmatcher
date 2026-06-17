@@ -90,6 +90,25 @@ class NEACatalog(CatalogBase):
     pmerr_key = "sy_pmerr1"
     pm_unit = u.mas / u.yr
 
+    ENRICH_KEYS = {
+        "planet_radius_key": "pl_radj",
+        "planet_flux_key": "pl_insol",
+        "planet_equilibrium_temperature_key": "pl_eqt",
+        "semi_major_axis_key": "pl_orbsmax",
+        "period_key": "pl_orbper",
+        "msini_key": "pl_msinij",
+        "star_spectral_type_key": "st_spectype",
+        "star_effective_temperature_key": "st_teff",
+        "star_radius_key": "st_rad",
+        "star_mass_key": "st_mass",
+        "star_logg_key": "st_logg",
+        "star_metallicity_key": "st_met",
+        "star_luminosity_key": "st_lum",
+        "vmag_key": "sy_vmag",
+        "kmag_key": "sy_kmag",
+        "distance_key": "sy_dist",
+    }
+
     def download(self) -> Table:
         """Query the NASA Exoplanet Archive TAP and return the raw table.
 

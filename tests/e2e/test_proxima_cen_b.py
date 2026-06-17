@@ -15,9 +15,9 @@ import numpy as np
 import pytest
 from astropy.table import Table
 
-from crossmatching import Crossmatcher, EMCCatalog, EMCIdSupplier, StellarParamMerger
-from crossmatching.enrichment import rocky_mask, temperate_mask
-from crossmatching.param_sources.hpic import HpicStellarParamSource
+from crossmatching import Crossmatcher, EMCCatalog, EMCIdSupplier, ParamFiller
+from crossmatching.enrichment import R_JUP_TO_EARTH, rocky_mask, temperate_mask
+from crossmatching.enrichment.param_sources.hpic import HpicParamSource
 
 _EMC_FILE = "exo-mercat.csv"
 _HZ_LOWER  = 0.35   # S_Earth outer edge
@@ -65,9 +65,9 @@ def proxima_enriched():
     result = xm.combined_crossmatch(query, "star_name")
 
     # ── enrich ──────────────────────────────────────────────────────────────
-    hpic_src = HpicStellarParamSource(result)
+    hpic_src = HpicParamSource(result)
     hpic_src.load()
-    return StellarParamMerger([hpic_src]).enrich(result)
+    return ParamFiller([hpic_src]).enrich(result)
 
 
 # ── crossmatch found the planet ──────────────────────────────────────────────
@@ -83,32 +83,24 @@ def test_proxima_cen_b_is_found(proxima_enriched):
 
 def test_proxima_cen_b_no_direct_radius(proxima_enriched):
     idx = _proxima_b_idx(proxima_enriched)
-    assert np.ma.is_masked(proxima_enriched["r_earth"][idx])
+    assert proxima_enriched["r"].mask[idx]  # no transit radius
 
 
 # ── msini-based radius estimates ─────────────────────────────────────────────
 
-def test_proxima_cen_b_r_earth_min_is_rocky(proxima_enriched):
+def test_proxima_cen_b_r_lower_bound_is_rocky(proxima_enriched):
     idx = _proxima_b_idx(proxima_enriched)
-    rmin = float(proxima_enriched["r_earth_min"][idx])
+    rmin = float(proxima_enriched["r_lower_bound"][idx])
     assert not np.isnan(rmin)
-    assert _ROCKY_LOWER < rmin < _ROCKY_UPPER, f"r_earth_min={rmin:.3f} outside rocky range"
-
-
-def test_proxima_cen_b_r_earth_max_is_rocky(proxima_enriched):
-    idx = _proxima_b_idx(proxima_enriched)
-    rmax = float(proxima_enriched["r_earth_max"][idx])
-    assert not np.isnan(rmax)
-    assert _ROCKY_LOWER < rmax < _ROCKY_UPPER, f"r_earth_max={rmax:.3f} outside rocky range"
-
+    assert _ROCKY_LOWER < rmin < _ROCKY_UPPER, f"r_lower_bound={rmin:.3f} outside rocky range"
 
 # ── insolation flux ───────────────────────────────────────────────────────────
 
 def test_proxima_cen_b_temperate(proxima_enriched):
     idx = _proxima_b_idx(proxima_enriched)
-    flux = float(proxima_enriched["flux_rel"][idx])
+    flux = float(proxima_enriched["pl_insol"][idx])
     assert not np.isnan(flux)
-    assert _HZ_LOWER < flux < _HZ_UPPER, f"flux_rel={flux:.3f} outside HZ range"
+    assert _HZ_LOWER < flux < _HZ_UPPER, f"pl_insol={flux:.3f} outside HZ range"
 
 
 # ── combined classification ───────────────────────────────────────────────────
@@ -118,11 +110,11 @@ def test_proxima_cen_b_is_temperate_uncertain_rocky(proxima_enriched):
     idx = _proxima_b_idx(out)
 
     is_temperate = temperate_mask(
-        out["flux_rel"], out["flux_rel_err1"], out["flux_rel_err2"],
+        out["pl_insol"], out["pl_insol_err1"], out["pl_insol_err2"],
         lower=_HZ_LOWER, upper=_HZ_UPPER,
     )[idx]
     is_uncertain_rocky = rocky_mask(
-        out["r_earth"], out["r_earth_min"], out["r_earth_max"],
+        out["r"] * R_JUP_TO_EARTH, out["r_lower_bound"], out["r_upper_bound"],
         lower=_ROCKY_LOWER, upper=_ROCKY_UPPER, use_interval=True,
     )[idx]
 
