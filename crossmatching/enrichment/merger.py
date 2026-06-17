@@ -31,16 +31,87 @@ def _col_float(table: Table, col: str):
     Returns an all-masked pair when the column is absent, so the
     optional EMC-schema planet columns (``r``, ``a``, ``p``, ``msini``)
     degrade gracefully on tables with other layouts.
+
+    Parameters
+    ----------
+    table : Table
+        The input astropy table.
+    col : str
+        The name of the column to extract.
+
+    Returns
+    -------
+    values : np.ndarray
+        Float array of the column's values.
+    mask : np.ndarray
+        Boolean array indicating masked (missing) values.
     """
     if col not in table.colnames:
         n = len(table)
         return np.zeros(n), np.ones(n, bool)
+    
     c = table[col]
-    return c, np.ma.getmaskarray(c)
+    if hasattr(c, 'mask'):
+        mask = np.array(c.mask, dtype=bool)
+        if mask.ndim == 0:
+            mask = np.full(len(c), mask.item(), dtype=bool)
+    else:
+        mask = np.zeros(len(c), bool)
+    return np.array(c, dtype=float), mask
+
+def _safe_err_sq(err: float, val: float = 1.0, coeff: float = 1.0) -> float:
+    """Safely compute the squared error term (coeff * err / val)^2.
+
+    Computes the scaled squared fractional error term commonly used in error
+    propagation formulas, ensuring no division by zero or NaN issues occur
+    if the error or value is invalid.
+
+    Parameters
+    ----------
+    err : float
+        The absolute error (1 sigma uncertainty).
+    val : float, optional
+        The measured value the error is associated with. Default is 1.0.
+    coeff : float, optional
+        A scaling coefficient applied to the fractional error. Default is 1.0.
+
+    Returns
+    -------
+    float
+        The calculated squared error term, or 0.0 if the input error is not finite.
+    """
+    return (coeff * err / val) ** 2 if np.isfinite(err) else 0.0
 
 
-def _derive_stellar_teff(i, teff, rad, lum, spec_arr):
-    """Derive stellar temperature if it is masked, using physical or statistical relations."""
+def _derive_stellar_teff(
+    i: int,
+    teff: _ParamQtyArrays,
+    rad: _ParamQtyArrays,
+    lum: _ParamQtyArrays,
+    spec_arr: _ParamStrArrays,
+) -> None:
+    r"""Derive stellar effective temperature if it is masked, using physical or statistical relations.
+
+    Calculates the temperature using the Stefan-Boltzmann law if radius and luminosity
+    are available:
+    
+    $$ T_{\\text{eff}} = T_{\\odot} \\left( \\frac{L}{R^2} \\right)^{1/4} $$
+
+    If not, estimates the temperature from the spectral type.
+
+    Parameters
+    ----------
+    i : int
+        The row index currently being processed.
+    teff : _ParamQtyArrays
+        Arrays containing stellar effective temperature data (modified in-place).
+    rad : _ParamQtyArrays
+        Arrays containing stellar radius data.
+    lum : _ParamQtyArrays
+        Arrays containing stellar luminosity data.
+    spec_arr : _ParamStrArrays
+        Arrays containing stellar spectral type data.
+    """
     if not teff.mask[i]:
         return
 
@@ -52,20 +123,13 @@ def _derive_stellar_teff(i, teff, rad, lum, spec_arr):
         teff.src[i] = f"SB_derived(rad:{rad.src[i]} lum:{lum.src[i]})"
         
         # Error propagation
-        l_val = lum.val[i]
-        r_val = rad.val[i]
-        l_err1 = lum.err1[i]
-        l_err2 = lum.err2[i]
-        r_err1 = rad.err1[i]
-        r_err2 = rad.err2[i]
+        t_l_up = _safe_err_sq(lum.err1[i], lum.val[i], 0.25)
+        t_l_dn = _safe_err_sq(lum.err2[i], lum.val[i], 0.25)
+        t_r_up = _safe_err_sq(rad.err1[i], rad.val[i], 0.5)
+        t_r_dn = _safe_err_sq(rad.err2[i], rad.val[i], 0.5)
         
-        term_l_up = (0.25 * l_err1 / l_val) ** 2 if np.isfinite(l_err1) else 0.0
-        term_r_dn = (0.5 * r_err2 / r_val) ** 2 if np.isfinite(r_err2) else 0.0
-        teff.err1[i] = t * np.sqrt(term_l_up + term_r_dn) if (term_l_up > 0 or term_r_dn > 0) else 0.0
-        
-        term_l_dn = (0.25 * l_err2 / l_val) ** 2 if np.isfinite(l_err2) else 0.0
-        term_r_up = (0.5 * r_err1 / r_val) ** 2 if np.isfinite(r_err1) else 0.0
-        teff.err2[i] = t * np.sqrt(term_l_dn + term_r_up) if (term_l_dn > 0 or term_r_up > 0) else 0.0
+        teff.err1[i] = t * np.sqrt(t_l_up + t_r_dn) if (t_l_up > 0 or t_r_dn > 0) else 0.0
+        teff.err2[i] = t * np.sqrt(t_l_dn + t_r_up) if (t_l_dn > 0 or t_r_up > 0) else 0.0
         
     # 2. Try estimation from spectral type
     elif not spec_arr.mask[i]:
@@ -88,8 +152,54 @@ def _derive_stellar_teff(i, teff, rad, lum, spec_arr):
             pass
 
 
-def _derive_stellar_radius(i, rad, mass, logg, teff, lum, met, kmag, dist, spec_val):
-    """Derive stellar radius if it is masked, using physical or statistical relations."""
+def _derive_stellar_radius(
+    i: int,
+    rad: _ParamQtyArrays,
+    mass: _ParamQtyArrays,
+    logg: _ParamQtyArrays,
+    teff: _ParamQtyArrays,
+    lum: _ParamQtyArrays,
+    met: _ParamQtyArrays,
+    kmag: _ParamQtyArrays,
+    dist: _ParamQtyArrays,
+    spec_val: str,
+) -> None:
+    r"""Derive stellar radius if it is masked, using physical or statistical relations.
+
+    Attempts to derive the radius in order of preference:
+    1. Exact physical relation from mass and log(g):
+       
+       $$ R = 10^{0.5(4.43797 + \\log_{10} M - \\log g)} $$
+       
+    2. Exact physical relation from luminosity and Teff (Stefan-Boltzmann):
+       
+       $$ R = \\sqrt{L} \\left( \\frac{T_{\\odot}}{T_{\\text{eff}}} \\right)^2 $$
+       
+    3. Empirical/statistical polynomial relations based on Teff and other parameters
+
+    Parameters
+    ----------
+    i : int
+        The row index currently being processed.
+    rad : _ParamQtyArrays
+        Arrays containing stellar radius data (modified in-place).
+    mass : _ParamQtyArrays
+        Arrays containing stellar mass data.
+    logg : _ParamQtyArrays
+        Arrays containing surface gravity data.
+    teff : _ParamQtyArrays
+        Arrays containing stellar effective temperature data.
+    lum : _ParamQtyArrays
+        Arrays containing stellar luminosity data.
+    met : _ParamQtyArrays
+        Arrays containing stellar metallicity data.
+    kmag : _ParamQtyArrays
+        Arrays containing 2MASS K-band magnitude data.
+    dist : _ParamQtyArrays
+        Arrays containing distance data.
+    spec_val : str
+        The spectral type string for the star.
+    """
     if not rad.mask[i]:
         return
 
@@ -101,19 +211,13 @@ def _derive_stellar_radius(i, rad, mass, logg, teff, lum, met, kmag, dist, spec_
         rad.src[i] = f"logg_derived(mass:{mass.src[i]} logg:{logg.src[i]})"
         
         # Error propagation
-        m_val = mass.val[i]
-        m_err1 = mass.err1[i]
-        m_err2 = mass.err2[i]
-        g_err1 = logg.err1[i]
-        g_err2 = logg.err2[i]
+        t_m_up = _safe_err_sq(mass.err1[i], mass.val[i], 0.5)
+        t_m_dn = _safe_err_sq(mass.err2[i], mass.val[i], 0.5)
+        t_g_up = _safe_err_sq(logg.err1[i], coeff=0.5 * np.log(10.0))
+        t_g_dn = _safe_err_sq(logg.err2[i], coeff=0.5 * np.log(10.0))
         
-        term_m_up = (0.5 * m_err1 / m_val) ** 2 if np.isfinite(m_err1) else 0.0
-        term_g_dn = (0.5 * np.log(10.0) * g_err2) ** 2 if np.isfinite(g_err2) else 0.0
-        rad.err1[i] = r * np.sqrt(term_m_up + term_g_dn) if (term_m_up > 0 or term_g_dn > 0) else 0.0
-        
-        term_m_dn = (0.5 * m_err2 / m_val) ** 2 if np.isfinite(m_err2) else 0.0
-        term_g_up = (0.5 * np.log(10.0) * g_err1) ** 2 if np.isfinite(g_err1) else 0.0
-        rad.err2[i] = r * np.sqrt(term_m_dn + term_g_up) if (term_m_dn > 0 or term_g_up > 0) else 0.0
+        rad.err1[i] = r * np.sqrt(t_m_up + t_g_dn) if (t_m_up > 0 or t_g_dn > 0) else 0.0
+        rad.err2[i] = r * np.sqrt(t_m_dn + t_g_up) if (t_m_dn > 0 or t_g_up > 0) else 0.0
         
     # 1.5. Try exact physical Stefan-Boltzmann relation next
     elif not lum.mask[i] and not teff.mask[i] and lum.val[i] > 0 and teff.val[i] > 0:
@@ -122,21 +226,14 @@ def _derive_stellar_radius(i, rad, mass, logg, teff, lum, met, kmag, dist, spec_
         rad.mask[i] = False
         rad.src[i] = f"SB_derived(lum:{lum.src[i]} teff:{teff.src[i]})"
         
-        # Error propagation: sigma_R = R * sqrt((1/2 * sigma_L / L)^2 + (2 * sigma_T / T)^2)
-        l_val = lum.val[i]
-        t_val = teff.val[i]
-        l_err1 = lum.err1[i]
-        l_err2 = lum.err2[i]
-        t_err1 = teff.err1[i]
-        t_err2 = teff.err2[i]
+        # Error propagation
+        t_l_up = _safe_err_sq(lum.err1[i], lum.val[i], 0.5)
+        t_l_dn = _safe_err_sq(lum.err2[i], lum.val[i], 0.5)
+        t_t_up = _safe_err_sq(teff.err1[i], teff.val[i], 2.0)
+        t_t_dn = _safe_err_sq(teff.err2[i], teff.val[i], 2.0)
         
-        term_l_up = (0.5 * l_err1 / l_val) ** 2 if np.isfinite(l_err1) else 0.0
-        term_t_dn = (2.0 * t_err2 / t_val) ** 2 if np.isfinite(t_err2) else 0.0
-        rad.err1[i] = r * np.sqrt(term_l_up + term_t_dn) if (term_l_up > 0 or term_t_dn > 0) else 0.0
-        
-        term_l_dn = (0.5 * l_err2 / l_val) ** 2 if np.isfinite(l_err2) else 0.0
-        term_t_up = (2.0 * t_err1 / t_val) ** 2 if np.isfinite(t_err1) else 0.0
-        rad.err2[i] = r * np.sqrt(term_l_dn + term_t_up) if (term_l_dn > 0 or term_t_up > 0) else 0.0
+        rad.err1[i] = r * np.sqrt(t_l_up + t_t_dn) if (t_l_up > 0 or t_t_dn > 0) else 0.0
+        rad.err2[i] = r * np.sqrt(t_l_dn + t_t_up) if (t_l_dn > 0 or t_t_up > 0) else 0.0
 
     # 2. Try empirical/statistical estimations from teff
     elif not teff.mask[i]:
@@ -193,8 +290,29 @@ def _derive_stellar_radius(i, rad, mass, logg, teff, lum, met, kmag, dist, spec_
                 rad.err1[i] = rad.err2[i] = 0.0
 
 
-def _derive_stellar_mass(i, mass, rad, logg):
-    """Derive stellar mass if it is masked, using the physical log(g) relation."""
+def _derive_stellar_mass(
+    i: int,
+    mass: _ParamQtyArrays,
+    rad: _ParamQtyArrays,
+    logg: _ParamQtyArrays,
+) -> None:
+    r"""Derive stellar mass if it is masked, using the physical log(g) relation.
+
+    Calculates the mass from the stellar radius and surface gravity log(g):
+    
+    $$ M = 10^{\\log g - 4.43797 + 2 \\log_{10} R} $$
+
+    Parameters
+    ----------
+    i : int
+        The row index currently being processed.
+    mass : _ParamQtyArrays
+        Arrays containing stellar mass data (modified in-place).
+    rad : _ParamQtyArrays
+        Arrays containing stellar radius data.
+    logg : _ParamQtyArrays
+        Arrays containing surface gravity data.
+    """
     if not mass.mask[i]:
         return
 
@@ -205,26 +323,33 @@ def _derive_stellar_mass(i, mass, rad, logg):
         mass.src[i] = f"logg_derived(rad:{rad.src[i]} logg:{logg.src[i]})"
         
         # Error propagation
-        r_val = rad.val[i]
-        r_err1 = rad.err1[i]
-        r_err2 = rad.err2[i]
-        g_err1 = logg.err1[i]
-        g_err2 = logg.err2[i]
+        t_r_up = _safe_err_sq(rad.err1[i], rad.val[i], 2.0)
+        t_r_dn = _safe_err_sq(rad.err2[i], rad.val[i], 2.0)
+        t_g_up = _safe_err_sq(logg.err1[i], coeff=np.log(10.0))
+        t_g_dn = _safe_err_sq(logg.err2[i], coeff=np.log(10.0))
         
-        term_r_up = (2.0 * r_err1 / r_val) ** 2 if np.isfinite(r_err1) else 0.0
-        term_g_up = (np.log(10.0) * g_err1) ** 2 if np.isfinite(g_err1) else 0.0
-        mass.err1[i] = m * np.sqrt(term_r_up + term_g_up) if (term_r_up > 0 or term_g_up > 0) else 0.0
-        
-        term_r_dn = (2.0 * r_err2 / r_val) ** 2 if np.isfinite(r_err2) else 0.0
-        term_g_dn = (np.log(10.0) * g_err2) ** 2 if np.isfinite(g_err2) else 0.0
-        mass.err2[i] = m * np.sqrt(term_r_dn + term_g_dn) if (term_r_dn > 0 or term_g_dn > 0) else 0.0
+        mass.err1[i] = m * np.sqrt(t_r_up + t_g_up) if (t_r_up > 0 or t_g_up > 0) else 0.0
+        mass.err2[i] = m * np.sqrt(t_r_dn + t_g_dn) if (t_r_dn > 0 or t_g_dn > 0) else 0.0
 
 
 class _ParamQtyArrays:
-    """arrays for one merged parameter: value, mask, provenance, errors.
+    """Arrays for one merged parameter: value, mask, provenance, and errors.
 
-    ``err1`` = upper 1σ uncertainty as positive magnitude; NaN = absent.
-    ``err2`` = lower 1σ uncertainty as positive magnitude; NaN = absent.
+    This class serves as a struct to hold the combined data for a single physical quantity
+    across all rows of a table during the enrichment process.
+
+    Attributes
+    ----------
+    val : np.ndarray
+        Array of the primary values for the parameter.
+    mask : np.ndarray
+        Boolean array where True indicates the value is missing or masked.
+    src : list of str
+        Provenance string for each row indicating where the value came from.
+    err1 : np.ndarray
+        Upper 1σ uncertainty as a positive magnitude; NaN if absent.
+    err2 : np.ndarray
+        Lower 1σ uncertainty as a positive magnitude; NaN if absent.
     """
 
     def __init__(self, n: int, fill: float = 0.0):
@@ -236,7 +361,20 @@ class _ParamQtyArrays:
 
 
 class _ParamStrArrays:
-    """arrays for one merged parameter: value, mask, provenance"""
+    """Arrays for one merged string parameter: value, mask, and provenance.
+
+    This class serves as a struct to hold the combined string data (e.g. spectral type)
+    across all rows of a table during the enrichment process.
+
+    Attributes
+    ----------
+    val : list of str
+        List of the primary string values for the parameter.
+    mask : np.ndarray
+        Boolean array where True indicates the value is missing, empty, or None.
+    src : list of str
+        Provenance string for each row indicating where the value came from.
+    """
     def __init__(self, n, fill: str = ''):
         self.val = [fill] * n
         self.mask = np.ones(n, bool)
@@ -291,235 +429,42 @@ class ParamFiller:
     param_names = param_names_quantities + param_names_strings
 
 
-    def enrich(
+    def _merge_values(
         self,
         table: Table,
-        planet_radius_key: str = 'r',
-        planet_flux_key: str = None,
-        planet_equilibrium_temperature_key: str = None,
-        semi_major_axis_key: str = 'a',
-        period_key: str = 'p',
-        msini_key: str = 'msini',
-        star_spectral_type_key = None,
-        star_radius_key: str = None,
-        star_mass_key: str = None,
-        star_effective_temperature_key: str = None,
-        star_logg_key: str = None,
-        star_metallicity_key: str = None,
-        star_luminosity_key: str = None,
-        vmag_key: str = None,
-        kmag_key: str = None,
-        distance_key: str = None,
-        upper_error_suffix: str | None = None,
-        lower_error_suffix: str | None = None,
+        params_q: dict[str, _ParamQtyArrays],
+        params_s: dict[str, _ParamStrArrays],
+        upper_error_suffix: str,
+        lower_error_suffix: str,
         input_starname_key: str | None = None,
         id_supplier: IdSupplierBase | None = None,
         alternate_ids: Table | None = None,
-        **override_keys,
-    ) -> Table:
-        """Return a copy of table with enriched columns added/replaced."""
-        # Set default suffixes from config if not provided
-        if upper_error_suffix is None:
-            upper_error_suffix = config.enrichment['source_err_suffix']
-        if lower_error_suffix is None:
-            lower_error_suffix = config.enrichment['dependent_err_suffix']
+    ) -> None:
+        """Merge fundamental stellar and planetary values from parameter sources.
 
-        n = len(table)
+        Iterates over the table rows and polls configured sources in priority order to 
+        fill missing parameters. Missing core stellar parameters (Teff, radius, mass) 
+        are then derived sequentially per row using log(g) or estimation techniques.
 
-        # ---------------------------------------------------------------------
-        # 1️  Fold and resolve all _key parameters (except input_starname_key)
-        # ---------------------------------------------------------------------
-        alias_to_canonical = {
-            'planet_radius': 'planet_radius',
-            'planet_radius_key': 'planet_radius',
-            'r': 'planet_radius',
-            'r_key': 'planet_radius',
-            
-            'planet_flux': 'planet_flux',
-            'planet_flux_key': 'planet_flux',
-            'planet_insol': 'planet_flux',
-            'planet_insol_key': 'planet_flux',
-            'pl_insol': 'planet_flux',
-            'pl_insol_key': 'planet_flux',
-            'flux_rel': 'planet_flux',
-            'flux_rel_key': 'planet_flux',
-            
-            'planet_equilibrium_temperature': 'planet_equilibrium_temperature',
-            'planet_equilibrium_temperature_key': 'planet_equilibrium_temperature',
-            'planet_eqt': 'planet_equilibrium_temperature',
-            'planet_eqt_key': 'planet_equilibrium_temperature',
-            'pl_eqt': 'planet_equilibrium_temperature',
-            'pl_eqt_key': 'planet_equilibrium_temperature',
-            
-            'semi_major_axis': 'semi_major_axis',
-            'semi_major_axis_key': 'semi_major_axis',
-            'a': 'semi_major_axis',
-            'a_key': 'semi_major_axis',
-            
-            'period': 'period',
-            'period_key': 'period',
-            'p': 'period',
-            'p_key': 'period',
-            
-            'msini': 'msini',
-            'msini_key': 'msini',
-            
-            'stellar_radius': 'stellar_radius',
-            'stellar_radius_key': 'stellar_radius',
-            'star_radius': 'stellar_radius',
-            'star_radius_key': 'stellar_radius',
-            'st_rad': 'stellar_radius',
-            'st_rad_key': 'stellar_radius',
-            
-            'stellar_mass': 'stellar_mass',
-            'stellar_mass_key': 'stellar_mass',
-            'star_mass': 'stellar_mass',
-            'star_mass_key': 'stellar_mass',
-            'st_mass': 'stellar_mass',
-            'st_mass_key': 'stellar_mass',
-            
-            'stellar_teff': 'stellar_teff',
-            'stellar_teff_key': 'stellar_teff',
-            'star_effective_temperature': 'stellar_teff',
-            'star_effective_temperature_key': 'stellar_teff',
-            'st_teff': 'stellar_teff',
-            'st_teff_key': 'stellar_teff',
-            
-            'stellar_logg': 'stellar_logg',
-            'stellar_logg_key': 'stellar_logg',
-            'star_logg': 'stellar_logg',
-            'star_logg_key': 'stellar_logg',
-            'st_logg': 'stellar_logg',
-            'st_logg_key': 'stellar_logg',
-            
-            'stellar_metallicity': 'stellar_metallicity',
-            'stellar_metallicity_key': 'stellar_metallicity',
-            'star_metallicity': 'stellar_metallicity',
-            'star_metallicity_key': 'stellar_metallicity',
-            'st_met': 'stellar_metallicity',
-            'st_met_key': 'stellar_metallicity',
-            
-            'stellar_luminosity': 'stellar_luminosity',
-            'stellar_luminosity_key': 'stellar_luminosity',
-            'star_luminosity': 'stellar_luminosity',
-            'star_luminosity_key': 'stellar_luminosity',
-            'st_lum': 'stellar_luminosity',
-            'st_lum_key': 'stellar_luminosity',
-            
-            'vmag': 'vmag',
-            'vmag_key': 'vmag',
-            'sy_vmag': 'vmag',
-            'sy_vmag_key': 'vmag',
-            
-            'kmag': 'kmag',
-            'kmag_key': 'kmag',
-            'sy_kmag': 'kmag',
-            'sy_kmag_key': 'kmag',
-            
-            'distance': 'distance',
-            'distance_key': 'distance',
-            'sy_dist': 'distance',
-            'sy_dist_key': 'distance',
-            
-            'spectral_type': 'spectral_type',
-            'spectral_type_key': 'spectral_type',
-            'star_spectral_type': 'spectral_type',
-            'star_spectral_type_key': 'spectral_type',
-            'st_spectype': 'spectral_type',
-            'st_spectype_key': 'spectral_type',
-        }
-
-        # Start with default column names
-        resolved_cols = {
-            'planet_radius': 'r',
-            'planet_flux': 'pl_insol',
-            'planet_equilibrium_temperature': 'pl_eqt',
-            'semi_major_axis': 'a',
-            'period': 'p',
-            'msini': 'msini',
-            'stellar_radius': 'st_rad',
-            'stellar_mass': 'st_mass',
-            'stellar_teff': 'st_teff',
-            'stellar_logg': 'st_logg',
-            'stellar_metallicity': 'st_met',
-            'stellar_luminosity': 'st_lum',
-            'vmag': 'sy_vmag',
-            'kmag': 'sy_kmag',
-            'distance': 'sy_dist',
-            'spectral_type': 'st_spectype',
-        }
-
-        # Collect explicit named params
-        provided_args = {
-            'planet_radius': planet_radius_key,
-            'planet_flux': planet_flux_key,
-            'planet_equilibrium_temperature': planet_equilibrium_temperature_key,
-            'semi_major_axis': semi_major_axis_key,
-            'period': period_key,
-            'msini': msini_key,
-            'spectral_type': star_spectral_type_key,
-            'stellar_radius': star_radius_key,
-            'stellar_mass': star_mass_key,
-            'stellar_teff': star_effective_temperature_key,
-            'stellar_logg': star_logg_key,
-            'stellar_metallicity': star_metallicity_key,
-            'stellar_luminosity': star_luminosity_key,
-            'vmag': vmag_key,
-            'kmag': kmag_key,
-            'distance': distance_key,
-        }
-
-        # Override with any explicit or custom keys passed
-        for k, v in provided_args.items():
-            if v is not None:
-                resolved_cols[k] = v
-        for k, v in override_keys.items():
-            if v is not None:
-                canonical_key = alias_to_canonical.get(k)
-                if canonical_key:
-                    resolved_cols[canonical_key] = v
-
-        # Set up quantities and strings mapping
-        params_q = {key: _ParamQtyArrays(n) for key in self.param_names_quantities}
-        params_s = {key: _ParamStrArrays(n) for key in self.param_names_strings}
-
-        internal_to_canonical = {
-            'st_rad': 'stellar_radius',
-            'st_mass': 'stellar_mass',
-            'st_teff': 'stellar_teff',
-            'st_logg': 'stellar_logg',
-            'st_met': 'stellar_metallicity',
-            'st_lum': 'stellar_luminosity',
-            'sy_vmag': 'vmag',
-            'sy_kmag': 'kmag',
-            'sy_dist': 'distance',
-            'pl_insol': 'planet_flux',
-            'pl_eqt': 'planet_equilibrium_temperature',
-            'st_spectype': 'spectral_type',
-        }
-
-        # Pre-load input table values as highest-priority source for each parameter
-        for param_name in self.param_names_quantities:
-            canonical_name = internal_to_canonical[param_name]
-            col_name = resolved_cols[canonical_name]
-            if col_name in table.colnames:
-                vals, mask = _col_float(table, col_name)
-                p = params_q[param_name]
-                p.val[:] = vals
-                p.mask[:] = mask
-                p.src[:] = ['input'] * n
-
-        for param_name in self.param_names_strings:
-            canonical_name = internal_to_canonical[param_name]
-            col_name = resolved_cols[canonical_name]
-            if col_name in table.colnames:
-                raw = table[col_name]
-                p = params_s[param_name]
-                p.val = list(raw)
-                p.mask = np.array([v == '' or v is None for v in raw])
-                p.src = ['input'] * n
-
-        # Populate the shortcut references used later in the algorithm.
+        Parameters
+        ----------
+        table : Table
+            The input catalog table.
+        params_q : dict of str to _ParamQtyArrays
+            Dictionary of quantitative parameters arrays to be filled in-place.
+        params_s : dict of str to _ParamStrArrays
+            Dictionary of string parameters arrays to be filled in-place.
+        upper_error_suffix : str
+            Suffix for upper error columns.
+        lower_error_suffix : str
+            Suffix for lower error columns.
+        input_starname_key : str, optional
+            Column name used to identify the host star for lookups.
+        id_supplier : IdSupplierBase, optional
+            An ID supplier for cross-referencing identifiers.
+        alternate_ids : Table, optional
+            A pre-loaded table of alternate IDs to use instead of fetching.
+        """
         rad = params_q['st_rad']
         mass = params_q['st_mass']
         teff = params_q['st_teff']
@@ -600,6 +545,226 @@ class ParamFiller:
             if 'spec' in merged:
                 spec_arr.val[i]     = merged['spec']
                 spec_arr.src[i]     = merged_src.get('spec', '')
+
+    def enrich(
+        self,
+        table: Table,
+        planet_radius_key: str = 'r',
+        planet_flux_key: str = None,
+        planet_equilibrium_temperature_key: str = None,
+        semi_major_axis_key: str = 'a',
+        period_key: str = 'p',
+        msini_key: str = 'msini',
+        star_spectral_type_key = None,
+        star_radius_key: str = None,
+        star_mass_key: str = None,
+        star_effective_temperature_key: str = None,
+        star_logg_key: str = None,
+        star_metallicity_key: str = None,
+        star_luminosity_key: str = None,
+        vmag_key: str = None,
+        kmag_key: str = None,
+        distance_key: str = None,
+        upper_error_suffix: str | None = None,
+        lower_error_suffix: str | None = None,
+        input_starname_key: str | None = None,
+        id_supplier: IdSupplierBase | None = None,
+        alternate_ids: Table | None = None,
+        **override_keys,
+    ) -> Table:
+        r"""Return a copy of table with enriched columns added/replaced.
+
+        Dataflow and Priority:
+        1. Values natively present in the input `table` columns always take the highest priority.
+        2. For any parameter that is missing or masked, the pipeline iterates through the 
+           configured list of parameter `sources` in priority order. The first source to 
+           return a valid, non-null value for a specific parameter fills that gap.
+        3. Once all sources are exhausted, any remaining gaps in fundamental stellar 
+           parameters (e.g., mass, radius, effective temperature) are estimated using 
+           established physical or empirical derivation formulas (e.g., log(g) physical 
+           relations, Stefan-Boltzmann, or polynomial scaling laws based on Teff/magnitudes).
+        
+        This method applies several physical formulas to derive missing planetary 
+        parameters:
+        
+        - Semi-major axis (Kepler's Third Law):
+          
+          $$ a = \left( M_{\star} \left( \frac{P}{365.25} \right)^2 \right)^{1/3} $$
+          
+        - Insolation Flux:
+          
+          $$ S = \frac{L}{a^2} \quad \text{or} \quad S = \left( \frac{T_{\text{eq}}}{254.793} \right)^4 $$
+          
+        - Equilibrium Temperature:
+          
+          $$ T_{\text{eq}} = 254.793 \cdot S^{1/4} $$
+
+        Parameters
+        ----------
+        table : Table
+            The input catalog table to enrich.
+        planet_radius_key : str, optional
+            Column name for planet radius (default: 'r').
+        planet_flux_key : str, optional
+            Column name for planet insolation flux.
+        planet_equilibrium_temperature_key : str, optional
+            Column name for planet equilibrium temperature.
+        semi_major_axis_key : str, optional
+            Column name for semi-major axis (default: 'a').
+        period_key : str, optional
+            Column name for orbital period (default: 'p').
+        msini_key : str, optional
+            Column name for minimum mass $M \sin i$ (default: 'msini').
+        star_spectral_type_key : str, optional
+            Column name for stellar spectral type.
+        star_radius_key : str, optional
+            Column name for stellar radius.
+        star_mass_key : str, optional
+            Column name for stellar mass.
+        star_effective_temperature_key : str, optional
+            Column name for stellar effective temperature.
+        star_logg_key : str, optional
+            Column name for stellar surface gravity.
+        star_metallicity_key : str, optional
+            Column name for stellar metallicity.
+        star_luminosity_key : str, optional
+            Column name for stellar luminosity.
+        vmag_key : str, optional
+            Column name for visual magnitude.
+        kmag_key : str, optional
+            Column name for K-band magnitude.
+        distance_key : str, optional
+            Column name for distance.
+        upper_error_suffix : str, optional
+            Suffix for upper error columns. Defaults to config enrichment value.
+        lower_error_suffix : str, optional
+            Suffix for lower error columns. Defaults to config enrichment value.
+        input_starname_key : str, optional
+            Column name used to identify the host star for lookups.
+        id_supplier : IdSupplierBase, optional
+            An ID supplier for cross-referencing identifiers.
+        alternate_ids : Table, optional
+            A pre-loaded table of alternate IDs to use instead of fetching.
+        **override_keys
+            Additional aliases mapped to parameter keys.
+
+        Returns
+        -------
+        Table
+            A new table containing the combined and physically derived parameters.
+        """
+        # Set default suffixes from config if not provided
+        if upper_error_suffix is None:
+            upper_error_suffix = config.enrichment['source_err_suffix']
+        if lower_error_suffix is None:
+            lower_error_suffix = config.enrichment['dependent_err_suffix']
+
+        n = len(table)
+
+        # ---------------------------------------------------------------------
+        # 1 Fold and resolve all _key parameters (except input_starname_key)
+        # ---------------------------------------------------------------------
+        # Start with default column names
+        resolved_cols = {
+            'planet_radius': 'r',
+            'planet_flux': 'pl_insol',
+            'planet_equilibrium_temperature': 'pl_eqt',
+            'semi_major_axis': 'a',
+            'period': 'p',
+            'msini': 'msini',
+            'star_radius': 'st_rad',
+            'star_mass': 'st_mass',
+            'star_effective_temperature': 'st_teff',
+            'star_logg': 'st_logg',
+            'star_metallicity': 'st_met',
+            'star_luminosity': 'st_lum',
+            'vmag': 'sy_vmag',
+            'kmag': 'sy_kmag',
+            'distance': 'sy_dist',
+            'star_spectral_type': 'st_spectype',
+        }
+
+        # Collect explicit named params
+        provided_args = {
+            'planet_radius': planet_radius_key,
+            'planet_flux': planet_flux_key,
+            'planet_equilibrium_temperature': planet_equilibrium_temperature_key,
+            'semi_major_axis': semi_major_axis_key,
+            'period': period_key,
+            'msini': msini_key,
+            'star_spectral_type': star_spectral_type_key,
+            'star_radius': star_radius_key,
+            'star_mass': star_mass_key,
+            'star_effective_temperature': star_effective_temperature_key,
+            'star_logg': star_logg_key,
+            'star_metallicity': star_metallicity_key,
+            'star_luminosity': star_luminosity_key,
+            'vmag': vmag_key,
+            'kmag': kmag_key,
+            'distance': distance_key,
+        }
+
+        # Override with any explicit or custom keys passed
+        for k, v in provided_args.items():
+            if v is not None:
+                resolved_cols[k] = v
+        for k, v in override_keys.items():
+            if v is not None and k.endswith('_key'):
+                canonical_key = k[:-4]
+                if canonical_key in resolved_cols:
+                    resolved_cols[canonical_key] = v
+
+        # Set up quantities and strings mapping
+        params_q = {key: _ParamQtyArrays(n) for key in self.param_names_quantities}
+        params_s = {key: _ParamStrArrays(n) for key in self.param_names_strings}
+
+        internal_to_canonical = {
+            'st_rad': 'star_radius',
+            'st_mass': 'star_mass',
+            'st_teff': 'star_effective_temperature',
+            'st_logg': 'star_logg',
+            'st_met': 'star_metallicity',
+            'st_lum': 'star_luminosity',
+            'sy_vmag': 'vmag',
+            'sy_kmag': 'kmag',
+            'sy_dist': 'distance',
+            'pl_insol': 'planet_flux',
+            'pl_eqt': 'planet_equilibrium_temperature',
+            'st_spectype': 'star_spectral_type',
+        }
+
+        # Pre-load input table values as highest-priority source for each parameter
+        for param_name in self.param_names_quantities:
+            canonical_name = internal_to_canonical[param_name]
+            col_name = resolved_cols[canonical_name]
+            if col_name in table.colnames:
+                vals, mask = _col_float(table, col_name)
+                p = params_q[param_name]
+                p.val[:] = vals
+                p.mask[:] = mask
+                p.src[:] = ['input'] * n
+
+        for param_name in self.param_names_strings:
+            canonical_name = internal_to_canonical[param_name]
+            col_name = resolved_cols[canonical_name]
+            if col_name in table.colnames:
+                raw = table[col_name]
+                p = params_s[param_name]
+                p.val = list(raw)
+                p.mask = np.array([v == '' or v is None for v in raw])
+                p.src = ['input'] * n
+
+        # Fill raw parameters from configured sources and derive fundamental stellar properties
+        self._merge_values(
+            table, params_q, params_s, upper_error_suffix, lower_error_suffix,
+            input_starname_key, id_supplier, alternate_ids
+        )
+
+        # Restore shortcut references needed for remaining column-level computations
+        rad = params_q['st_rad']
+        mass = params_q['st_mass']
+        teff = params_q['st_teff']
+        spec_arr = params_s['st_spectype']
 
         st_spectype = [
             spectype_display(spec_arr.val[i], teff.val[i] if not teff.mask[i] else 0.0)

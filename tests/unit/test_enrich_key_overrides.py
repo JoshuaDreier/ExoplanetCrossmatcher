@@ -74,7 +74,7 @@ def test_override_output_column_uses_custom_name():
     """The merged radius should live under the caller-supplied name, not 'st_rad'."""
     nea = _nea_source(rad=0.9)
     cat = _catalog("my_rad", 1.2)
-    result = ParamFiller([nea]).enrich(cat, stellar_radius_key="my_rad")
+    result = ParamFiller([nea]).enrich(cat, star_radius_key="my_rad")
     assert "my_rad" in result.colnames
     assert "st_rad" not in result.colnames
 
@@ -83,7 +83,7 @@ def test_override_provenance_columns_use_custom_name():
     """``my_rad_src``, ``my_rad_err1``, ``my_rad_err2`` should be present."""
     nea = _nea_source(rad=0.9)
     cat = _catalog("my_rad", 1.2)
-    result = ParamFiller([nea]).enrich(cat, stellar_radius_key="my_rad")
+    result = ParamFiller([nea]).enrich(cat, star_radius_key="my_rad")
     assert "my_rad_src"  in result.colnames
     assert "my_rad_err1" in result.colnames
     assert "my_rad_err2" in result.colnames
@@ -97,7 +97,7 @@ def test_override_input_wins_over_nea():
     """A valid input value must not be overwritten by the NEA source."""
     nea = _nea_source(rad=0.9)          # NEA has rad=0.9
     cat = _catalog("my_rad", 1.2)       # input has rad=1.2  ← should win
-    result = ParamFiller([nea]).enrich(cat, stellar_radius_key="my_rad")
+    result = ParamFiller([nea]).enrich(cat, star_radius_key="my_rad")
     assert float(result["my_rad"][0]) == pytest.approx(1.2)
 
 
@@ -105,7 +105,7 @@ def test_override_input_src_is_input():
     """When the input column supplies the value, src must be 'input'."""
     nea = _nea_source(rad=0.9)
     cat = _catalog("my_rad", 1.2)
-    result = ParamFiller([nea]).enrich(cat, stellar_radius_key="my_rad")
+    result = ParamFiller([nea]).enrich(cat, star_radius_key="my_rad")
     assert str(result["my_rad_src"][0]) == "input"
 
 
@@ -117,7 +117,7 @@ def test_override_masked_input_falls_back_to_nea():
     """A masked input cell should be filled by the next source (NEA)."""
     nea = _nea_source(rad=0.9)
     cat = _catalog("my_rad", 0.0, mask=True)   # masked → should fall back
-    result = ParamFiller([nea]).enrich(cat, stellar_radius_key="my_rad")
+    result = ParamFiller([nea]).enrich(cat, star_radius_key="my_rad")
     assert float(result["my_rad"][0]) == pytest.approx(0.9)
 
 
@@ -125,7 +125,7 @@ def test_override_masked_input_src_is_nea():
     """When fallback from NEA fills the value, src must be 'nea'."""
     nea = _nea_source(rad=0.9)
     cat = _catalog("my_rad", 0.0, mask=True)
-    result = ParamFiller([nea]).enrich(cat, stellar_radius_key="my_rad")
+    result = ParamFiller([nea]).enrich(cat, star_radius_key="my_rad")
     assert str(result["my_rad_src"][0]) == "nea"
 
 
@@ -133,7 +133,7 @@ def test_override_absent_column_falls_back_to_nea():
     """If the override column is entirely absent from the table, NEA still fills."""
     nea = _nea_source(rad=0.9)
     cat = Table({"nasa_name": ["Planet X"], "main_id": [""]})
-    result = ParamFiller([nea]).enrich(cat, stellar_radius_key="missing_col")
+    result = ParamFiller([nea]).enrich(cat, star_radius_key="missing_col")
     assert float(result["missing_col"][0]) == pytest.approx(0.9)
     assert str(result["missing_col_src"][0]) == "nea"
 
@@ -152,8 +152,8 @@ def test_multiple_overrides_independent():
         "my_teff":   MaskedColumn([5800.0], mask=[False]),
     })
     result = ParamFiller([nea]).enrich(cat,
-                                        stellar_radius_key="my_rad",
-                                        stellar_teff_key="my_teff")
+                                        star_radius_key="my_rad",
+                                        star_effective_temperature_key="my_teff")
     assert "my_rad"  in result.colnames and "st_rad"  not in result.colnames
     assert "my_teff" in result.colnames and "st_teff" not in result.colnames
     assert float(result["my_rad"][0])  == pytest.approx(1.2)
@@ -166,25 +166,7 @@ def test_multiple_overrides_independent():
 # 5. Explicit keyword arg (star_radius_key=) and **override_keys form are equivalent
 # ---------------------------------------------------------------------------
 
-def test_explicit_kwarg_star_radius_key_equivalent_to_override():
-    """``star_radius_key='x'`` (explicit) and ``stellar_radius_key='x'``
-    (**override_keys) must produce identical results."""
-    nea = _nea_source(rad=0.9)
 
-    cat = Table({
-        "nasa_name": ["Planet X"],
-        "main_id":   [""],
-        "col_a": MaskedColumn([1.2], mask=[False]),
-        "col_b": MaskedColumn([1.2], mask=[False]),
-    })
-
-    result_explicit  = ParamFiller([nea]).enrich(cat, star_radius_key="col_a")
-    result_override  = ParamFiller([nea]).enrich(cat, stellar_radius_key="col_b")
-
-    assert "col_a" in result_explicit.colnames
-    assert "col_b" in result_override.colnames
-    assert float(result_explicit["col_a"][0]) == pytest.approx(float(result_override["col_b"][0]))
-    assert str(result_explicit["col_a_src"][0]) == str(result_override["col_b_src"][0])
 
 
 # ---------------------------------------------------------------------------
@@ -199,7 +181,7 @@ def test_non_overridden_params_keep_canonical_names(tmp_path):
         "main_id":   [""],
         "my_rad":    MaskedColumn([1.2], mask=[False]),
     })
-    result = ParamFiller([nea]).enrich(cat, stellar_radius_key="my_rad")
+    result = ParamFiller([nea]).enrich(cat, star_radius_key="my_rad")
     # mass was NOT overridden → canonical name
     assert "st_mass" in result.colnames
     assert "sy_dist" in result.colnames
@@ -255,7 +237,7 @@ def test_flux_rel_key_as_override_key_behaves_as_pl_insol_override():
         "main_id":   [""],
         "my_flux":   MaskedColumn([1.5], mask=[False]),
     })
-    result = ParamFiller([nea]).enrich(cat, flux_rel_key="my_flux")
+    result = ParamFiller([nea]).enrich(cat, planet_flux_key="my_flux")
     
     assert "my_flux" in result.colnames
     assert "my_flux_src" in result.colnames
@@ -286,9 +268,8 @@ def test_star_effective_temperature_key_override():
 
 
 def test_unified_folding_of_all_key_params():
-    """Verify that all _key parameters (except input_starname_key) are folded:
-    they prioritize the input column, write outputs to the same column name,
-    preserve valid values, and allow both suffix-less and suffix-ed forms.
+    """Verify that key parameters prioritize the input column, write 
+    outputs to the same column name, and preserve valid values.
     """
     nea = _nea_source(teff=5778.0, rad=1.0)
     cat = Table({
@@ -297,17 +278,9 @@ def test_unified_folding_of_all_key_params():
         "my_radius": MaskedColumn([1.5], mask=[False]),
     })
     
-    # 1. Test using suffix-ed form
-    result1 = ParamFiller([nea]).enrich(cat, stellar_radius_key="my_radius")
+    # Test using explicit kwarg
+    result1 = ParamFiller([nea]).enrich(cat, star_radius_key="my_radius")
     assert "my_radius" in result1.colnames
     assert "my_radius_src" in result1.colnames
     assert "st_rad" not in result1.colnames
     assert float(result1["my_radius"][0]) == pytest.approx(1.5)  # priority was input (1.5), not nea source (1.0)
-    assert str(result1["my_radius_src"][0]) == "input"
-
-    # 2. Test using suffix-less form via **override_keys
-    result2 = ParamFiller([nea]).enrich(cat, stellar_radius="my_radius")
-    assert "my_radius" in result2.colnames
-    assert float(result2["my_radius"][0]) == pytest.approx(1.5)
-
-

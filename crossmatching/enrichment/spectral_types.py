@@ -109,18 +109,30 @@ def teff_to_spectype(teff: float, *, prefix: str = "~") -> str:
 
 
 def get_spectral_class_range(spectype: str) -> tuple[float, float]:
-    """Get the min and max Teff (K) for the major spectral class (letter) of spectype."""
-    s = spectype.strip().upper()
-    if not s:
+    """Get the min and max Teff (K) for the major spectral class (letter) of spectype.
+
+    Parses the provided spectral type string to identify its primary spectral class
+    (e.g., 'O', 'B', 'A', 'F', 'G', 'K', 'M'), then returns the minimum and maximum 
+    effective temperatures corresponding to that class based on the internal anchor tables.
+
+    Parameters
+    ----------
+    spectype : str
+        The full spectral type string (e.g., 'G2V', 'M5').
+
+    Returns
+    -------
+    tuple[float, float]
+        A tuple of (min_teff, max_teff). Returns (0.0, 0.0) if the spectral class 
+        is invalid or not found.
+    """
+    m = re.search(r'([OBAFGKMLTY])', spectype.strip().upper())
+    if not m:
         return 0.0, 0.0
-    for char in s:
-        if char in _LETTER_ORDER:
-            letter = char
-            break
-    else:
-        return 0.0, 0.0
-    
+        
+    letter = m.group(1)
     class_teffs = [t for name, t in _TEFF_SPECTYPE if name.upper().startswith(letter)]
+    
     if not class_teffs:
         return 0.0, 0.0
         
