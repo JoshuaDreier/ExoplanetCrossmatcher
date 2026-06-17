@@ -11,7 +11,7 @@ KEYS = dict(
     dec_key="dec",
     dec_unit=u.degree,
     host_key="hostname", 
-    planet_uuid="pl_name"
+    planet_uid="pl_name"
 )
 
 
@@ -67,7 +67,7 @@ def test_file_catalog_column_keys_stored():
     assert catalog.ra_key == "ra"
     assert catalog.dec_key == "dec"
     assert catalog.host_key == "hostname"
-    assert catalog.planet_uuid == "pl_name"
+    assert catalog.planet_uid == "pl_name"
     assert catalog.pm_key is None
 
 
@@ -80,7 +80,7 @@ def test_file_catalog_accepts_custom_keys(simple_csv):
         dec_key="dec",
         dec_unit=u.degree,
         host_key="hostname",
-        planet_uuid="pl_name",
+        planet_uid="pl_name",
     )
     assert catalog.host_key == "hostname"
-    assert catalog.planet_uuid == "pl_name"
+    assert catalog.planet_uid == "pl_name"

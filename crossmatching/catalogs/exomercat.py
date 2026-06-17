@@ -21,7 +21,7 @@ class EMCCatalog(CatalogBase):
     dec_key = "main_id_dec"
     dec_unit = u.degree
     host_key = "host"
-    planet_uuid = "exo-mercat_name"
+    planet_uid = "exo-mercat_name"
     pm_key = None
     pmerr_key = None
 

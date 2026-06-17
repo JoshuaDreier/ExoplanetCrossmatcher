@@ -26,7 +26,7 @@ class CatalogBase:
     host_key : str
         Column name identifying the host-star name.  Used as the join
         key in ID-based crossmatching.
-    planet_uuid : str
+    planet_uid : str
         Column that uniquely identifies a planet row (e.g. ``'pl_name'``
         for the NASA Exoplanet Archive).
     pm_key : str or None
@@ -45,7 +45,7 @@ class CatalogBase:
     dec_key: str
     dec_unit: u.Unit
     host_key: str
-    planet_uuid: str
+    planet_uid: str
     pm_key: str | None
     pmerr_key: str | None
     pm_unit: u.Unit = u.mas / u.yr

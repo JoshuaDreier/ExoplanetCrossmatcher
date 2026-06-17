@@ -78,7 +78,7 @@ coord_result = cm.coordinate_crossmatch(
 1. Run `id_crossmatch()`.
 2. Run `coordinate_crossmatch()`.
 3. Remove from the coordinate results any planet already found by ID (matched
-   on `planet_uuid`, e.g. `pl_name`).
+   on `planet_uid`, e.g. `pl_name`).
 4. Stack ID results on top of the filtered coordinate results.
 
 ```python

@@ -70,7 +70,7 @@ class NEACatalog(CatalogBase):
         declination unit, degrees, u.deg
     host_key : str
         ``'hostname'`` — host-star name column (join key for ID matching).
-    planet_uuid : str
+    planet_uid : str
         ``'pl_name'`` — unique planet-name column.
     pm_key : str
         ``'sy_pm'`` — total proper-motion column.
@@ -85,7 +85,7 @@ class NEACatalog(CatalogBase):
     dec_key = "dec"
     dec_unit = u.deg
     host_key = "hostname"
-    planet_uuid = "pl_name"
+    planet_uid = "pl_name"
     pm_key = "sy_pm"
     pmerr_key = "sy_pmerr1"
     pm_unit = u.mas / u.yr

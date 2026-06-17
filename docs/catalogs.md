@@ -20,7 +20,7 @@ table = catalog.load(from_file="pscomppars.txt")  # from cache
 | `ra_key`      | `'ra'`        | Right ascension (degrees, J2000)   |
 | `dec_key`     | `'dec'`       | Declination (degrees, J2000)       |
 | `host_key`    | `'hostname'`  | Host-star name (join key)          |
-| `planet_uuid` | `'pl_name'`   | Unique planet name                 |
+| `planet_uid` | `'pl_name'`   | Unique planet name                 |
 | `pm_key`      | `'sy_pm'`     | Total proper motion (mas/yr)       |
 | `pmerr_key`   | `'sy_pmerr1'` | Proper-motion uncertainty (mas/yr) |
 
@@ -69,7 +69,7 @@ catalog = FileCatalog(
     ra_key="ra_deg",
     dec_key="dec_deg",
     host_key="host_star",
-    planet_uuid="planet_id",
+    planet_uid="planet_id",
     pm_key=None,       # no proper motion in this file
     pmerr_key=None,
     format="ascii.csv",
@@ -90,7 +90,7 @@ class MyTAPCatalog(CatalogBase):
     ra_key = "ra"
     dec_key = "dec"
     hostname_key = "host"       
-    planet_uuid = "planet_name" 
+    planet_uid = "planet_name" 
     pm_key = None               
     pmerr_key = None            
 

@@ -24,7 +24,7 @@ class FileCatalog(CatalogBase):
         Unit of the ``dec_key`` column.
     host_key : str
         Column name for host-star names (join key for ID matching).
-    planet_uuid : str
+    planet_uid : str
         Column that uniquely identifies each planet row.
     pm_key : str, optional
         Column name for total proper motion.  ``None`` if the file does
@@ -47,7 +47,7 @@ class FileCatalog(CatalogBase):
         dec_key: str,
         dec_unit: u.Unit,
         host_key: str,
-        planet_uuid: str,
+        planet_uid: str,
         pm_key: str | None = None,
         pmerr_key: str | None = None,
         pm_unit: u.Unit = u.mas / u.yr,
@@ -60,7 +60,7 @@ class FileCatalog(CatalogBase):
         self.dec_key = dec_key
         self.dec_unit = dec_unit
         self.host_key = host_key
-        self.planet_uuid = planet_uuid
+        self.planet_uid = planet_uid
         self.pm_key = pm_key
         self.pmerr_key = pmerr_key
         self.pm_unit = pm_unit

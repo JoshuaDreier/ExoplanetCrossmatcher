@@ -88,7 +88,7 @@ class Crossmatcher:
 
     :meth:`combined_crossmatch` runs ID matching and coordinate matching
     over the *full* input table, then removes planets already found by
-    ID from the coordinate results (deduplication by ``planet_uuid``),
+    ID from the coordinate results (deduplication by ``planet_uid``),
     so ID matches take priority.
 
     Parameters
@@ -138,7 +138,7 @@ class Crossmatcher:
         self.id_matched: Table = None
         self.coords2d_matched: Table = None
         self.matched: Table = None
-        self.planet_uuid = self.catalog.planet_uuid
+        self.planet_uid = self.catalog.planet_uid
 
     def _cache_catalog(self, table: Table) -> None:
         self.catalog_table = table
@@ -607,7 +607,7 @@ class Crossmatcher:
         Executes :meth:`id_crossmatch` first, then
         :meth:`coordinate_crossmatch`.  Planets already found by ID
         matching are removed from the coordinate results (deduplication
-        by ``planet_uuid``) before the two tables are stacked.  This
+        by ``planet_uid``) before the two tables are stacked.  This
         ensures each planet row appears at most once, with ID matches
         taking priority.
 
@@ -644,7 +644,7 @@ class Crossmatcher:
               great-circle distance between the matched input and catalog
               positions (present for both ID and coordinate matches).
         """
-        uuid = self.planet_uuid
+        uuid = self.planet_uid
 
         id_results = self.id_crossmatch(
             input_table,

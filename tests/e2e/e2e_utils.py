@@ -9,7 +9,7 @@ def get_planets_for_star(star_name, ra, dec, crossmatcher, crossmatching_method)
         names=["star_name", "ra", "dec"],
     )
     results = crossmatching_method(crossmatcher, query_row)
-    return results[crossmatcher.planet_uuid].tolist()
+    return results[crossmatcher.planet_uid].tolist()
 
 
 def _e2e_all_planets_found(star_name, ra, dec, expected_planets, crossmatcher, crossmatching_method):
