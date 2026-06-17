@@ -75,8 +75,9 @@ result["star_name", "pl_name", "match_type", "crossmatching_angular_separation"]
 Expect this to run for ~3 minutes on the first run due to the NASA & SIMBAD TAP queries (each taking ~1.5 min) On second run, with commented out .download line, the code should run in seconds. If `from_file=...`is left out, the download will be performed too (but is not saved to disk).
 
 The `match_type` column is 
-- `'id'` for identifier matches and
-- `'coordinates'` for position-based matches.
+- `'id'` for identifier matches,
+- `'coordinates'` for position-based matches, and
+- `'id+coordinates'` if a planet is matched via both methods.
 
 If a collision between column names between the input catalog and the `cm.catalog`occurs, the input catalog's columns are suffixed with `_input`and all catalog columns pass through unchanged.
 
@@ -122,7 +123,7 @@ class MyTAPCatalog(CatalogBase):
     ra_key = "ra"
     dec_key = "dec"
     hostname_key = "host"       
-    planet_uuid = "planet_name" 
+    planet_uid = "planet_name" 
     pm_key = None               
     pmerr_key = None            
 

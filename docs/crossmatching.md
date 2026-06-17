@@ -85,8 +85,7 @@ coord_result = cm.coordinate_crossmatch(
 result = cm.combined_crossmatch(hpic, input_starname_key="star_name")
 ```
 
-ID matches take priority: if a planet is found by both methods it appears only
-once, tagged `match_type = 'id'`.
+If a planet is found by both methods, it appears only once in the combined results, tagged with `match_type = 'id+coordinates'`.
 [detect-duplicates](detect-duplicates.md)
 
 

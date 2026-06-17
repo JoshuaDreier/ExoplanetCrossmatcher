@@ -8,7 +8,7 @@
 
 | Column                             | Type              | Match types      | Description                                                                  |
 | ---------------------------------- | ----------------- | ---------------- | ---------------------------------------------------------------------------- |
-| `match_type`                       | str               | all              | `'id'` — found via identifier match; `'coordinates'` — found by sky position |
+| `match_type`                       | str               | all              | `'id'` — found via identifier match; `'coordinates'` — found by sky position; `'id+coordinates'` — matched by both methods |
 | `crossmatching_angular_separation` | Quantity (arcsec) | coordinates only | Angular distance between the matched input and catalog positions             |
 
 ### NEA passthrough columns (selected)

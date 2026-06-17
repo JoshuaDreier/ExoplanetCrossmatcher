@@ -29,8 +29,8 @@ def test_combined_finds_id_match():
     cm = _make_cm_id_only()
     input_table = Table({
         "star_name": ["id-only-input"],
-        "ra":        [0.0],
-        "dec":       [0.0],
+        "ra":        [180.0],
+        "dec":       [45.0],
     })
     result = cm.combined_crossmatch(input_table, "star_name")
     planets = result["pl_name"].tolist()
@@ -70,8 +70,8 @@ def test_combined_deduplicates():
     assert result["pl_name"].tolist().count("Both Star b") == 1
 
 
-def test_combined_id_match_favored_over_coord_match():
-    """If a star is matched by both ID and coordinates, the match_type should be 'id'."""
+def test_combined_both_methods_match():
+    """If a star is matched by both ID and coordinates, the match_type should be 'id+coordinates'."""
     cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
     cm._cache_catalog(make_catalog({"hostname": "Both Star", "pl_name": "Both Star b", "ra": 100.0, "dec": 20.0}))
     cm._cache_alternate_ids(
@@ -84,7 +84,7 @@ def test_combined_id_match_favored_over_coord_match():
         "dec":       [ 20.0],
     })
     result = cm.combined_crossmatch(input_table, "star_name")
-    assert result["match_type"][result["star_name"] == "both-match-input"] == ["id"]
+    assert result["match_type"][result["star_name"] == "both-match-input"] == ["id+coordinates"]
 
 
 def test_combined_one_id_one_2d():

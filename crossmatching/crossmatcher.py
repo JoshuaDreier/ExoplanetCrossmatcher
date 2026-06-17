@@ -639,7 +639,7 @@ class Crossmatcher:
         matched : `~astropy.table.Table`
             Combined table of all matched planet rows.  Added columns:
 
-            - ``match_type`` : ``'id'`` or ``'coordinates'``
+            - ``match_type`` : ``'id'``, ``'coordinates'`` or ``'id+coordinates'``
             - ``angular_separation`` : `~astropy.units.Quantity` (arcsec),
               great-circle distance between the matched input and catalog
               positions (present for both ID and coordinate matches).
@@ -663,6 +663,16 @@ class Crossmatcher:
             dec_key=dec_key,
             dec_unit=dec_unit, 
         )
+
+        both_mask = np.isin(id_results[uuid], coord_results[uuid])
+        if np.any(both_mask):
+            label_len = max(15, len(self.id_match_label) + len(self.coord_match_label) + 1)
+            new_col = astropy.table.Column(
+                id_results[self.match_type_key].astype(f"U{label_len}"),
+                name=self.match_type_key
+            )
+            id_results[self.match_type_key] = new_col
+            id_results[self.match_type_key][both_mask] = f"{self.id_match_label}+{self.coord_match_label}"
 
         only_coords = coord_results[
             ~np.isin(coord_results[uuid], id_results[uuid])
