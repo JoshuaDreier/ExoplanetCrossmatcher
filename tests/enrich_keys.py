@@ -1,0 +1,18 @@
+DEFAULT_ENRICH_KEYS = {
+    'planet_radius_key': 'r',
+    'planet_flux_key': 'pl_insol',
+    'planet_equilibrium_temperature_key': 'pl_eqt',
+    'semi_major_axis_key': 'a',
+    'period_key': 'p',
+    'msini_key': 'msini',
+    'star_spectral_type_key': 'st_spectype',
+    'star_radius_key': 'st_rad',
+    'star_mass_key': 'st_mass',
+    'star_effective_temperature_key': 'st_teff',
+    'star_logg_key': 'st_logg',
+    'star_metallicity_key': 'st_met',
+    'star_luminosity_key': 'st_lum',
+    'vmag_key': 'sy_vmag',
+    'kmag_key': 'sy_kmag',
+    'distance_key': 'sy_dist',
+}

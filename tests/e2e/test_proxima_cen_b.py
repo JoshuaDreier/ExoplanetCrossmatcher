@@ -13,6 +13,7 @@ import os
 
 import numpy as np
 import pytest
+from tests.enrich_keys import DEFAULT_ENRICH_KEYS
 from astropy.table import Table
 
 from crossmatching import Crossmatcher, EMCCatalog, EMCIdSupplier, ParamFiller
@@ -67,7 +68,7 @@ def proxima_enriched():
     # ── enrich ──────────────────────────────────────────────────────────────
     hpic_src = HpicParamSource(result)
     hpic_src.load()
-    return ParamFiller([hpic_src]).enrich(result)
+    return ParamFiller([hpic_src]).enrich(result, **{**DEFAULT_ENRICH_KEYS, **DEFAULT_ENRICH_KEYS})
 
 
 # ── crossmatch found the planet ──────────────────────────────────────────────

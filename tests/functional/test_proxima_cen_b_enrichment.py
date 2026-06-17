@@ -11,6 +11,7 @@ without any network calls or file I/O.
 """
 import numpy as np
 import pytest
+from tests.enrich_keys import DEFAULT_ENRICH_KEYS
 from astropy import units as u
 from astropy.table import Table
 
@@ -68,7 +69,7 @@ def proxima_enriched():
     })
 
     merger = ParamFiller([src])
-    return merger.enrich(table)
+    return merger.enrich(table, **{**DEFAULT_ENRICH_KEYS, **DEFAULT_ENRICH_KEYS})
 
 
 # ── radius from msini ─────────────────────────────────────────────────────────

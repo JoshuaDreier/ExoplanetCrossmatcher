@@ -8,6 +8,7 @@ Four planets exercise the full tier precedence and msini radius estimation:
 """
 import numpy as np
 import pytest
+from tests.enrich_keys import DEFAULT_ENRICH_KEYS
 from astropy import units as u
 from astropy.table import MaskedColumn, Table
 
@@ -112,7 +113,7 @@ def enriched():
     simbad_src._lookup = simbad_src._build_lookup(_simbad_table())
 
     merger = ParamFiller([hpic_src, nea_src, simbad_src])
-    return merger.enrich(_catalog_table())
+    return merger.enrich(_catalog_table(), **DEFAULT_ENRICH_KEYS)
 
 
 def _row(table, name):
@@ -153,7 +154,7 @@ def test_enrich_handles_missing_planet_columns():
         "nasa_name":       ["Planet A"],
         "main_id":         [""],
     })
-    result = ParamFiller([nea]).enrich(catalog)
+    result = ParamFiller([nea]).enrich(catalog, **{**DEFAULT_ENRICH_KEYS, **DEFAULT_ENRICH_KEYS})
     assert np.ma.is_masked(result["r_lower_bound"][0])
     assert np.ma.is_masked(result["r_upper_bound"][0])
     assert str(result["a_src"][0]) == ""
@@ -253,7 +254,7 @@ def test_computed_flux_src_lists_all_inputs():
         "p":               [365.0],
     })
     merger = ParamFiller([nea])
-    result = merger.enrich(catalog)
+    result = merger.enrich(catalog, **{**DEFAULT_ENRICH_KEYS, **DEFAULT_ENRICH_KEYS})
     src = str(result["pl_insol_src"][0])
     assert "r:" in src
     assert "teff:" in src
