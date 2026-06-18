@@ -34,7 +34,9 @@ def _to_float(val) -> float:
         return float(val)
     except (TypeError, ValueError):
         return np.nan
-
+    
+def _mc(arr, name, desc=''):
+    return MaskedColumn(arr, mask=~np.isfinite(arr), name=name, description=desc)
 
 def _try_get_column(table: Table, col: str):
     """Return (values, mask) float arrays for a table column.
@@ -62,7 +64,38 @@ def _try_get_column(table: Table, col: str):
     
     return table[col], np.ma.getmaskarray(table[col])
 
+def _extract_param_arrays(param_list: list) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list]:
+    """
+    Extract physical parameter attributes from a list of objects into vectorized arrays.
 
+    Parameters
+    ----------
+    param_list : list
+        A list of parameter objects (e.g., ParamQty) containing the attributes 
+        'val', 'mask', 'err1', 'err2', and 'src'.
+
+    Returns
+    -------
+    val : np.ndarray
+        Array of parameter values.
+    mask : np.ndarray
+        Boolean array indicating masked or invalid entries.
+    err1 : np.ndarray
+        Array of upper error values.
+    err2 : np.ndarray
+        Array of lower error values.
+    src : list
+        List of data source strings for each entry.
+    """
+    return (
+        np.array([x.val for x in param_list]),
+        np.array([x.mask for x in param_list]),
+        np.array([x.err1 for x in param_list]),
+        np.array([x.err2 for x in param_list]),
+        [x.src for x in param_list]
+    )
+
+        
 class ParamFiller:
     """Enriches a catalog table with stellar and derived planetary parameters.
 
@@ -72,25 +105,8 @@ class ParamFiller:
     from the merged parameters.
     """
 
-    def __init__(self, sources: list[ParamSource], msini_sin_min: float = 0.3):
-        """Initialise the merger with an ordered list of parameter sources.
 
-        Parameters
-        ----------
-        sources : list of `~crossmatching.param_sources.base.ParamSource`
-            Priority-ordered parameter sources.  For each  parameter the 
-            first source that provides a non-null value wins.
-        msini_sin_min : float, optional
-            Minimum sin(inclination) assumed when converting msini to a
-            radius upper bound via the Chen & Kipping relation.  Default
-            0.5, corresponding to an 86.6 % confidence-interval upper
-            bound on the true mass under an isotropic inclination prior
-            (Stevens & Gaudi 2013).
-        """
-        self.sources = sources
-        self.msini_sin_min = msini_sin_min
-
-    param_names_quantities = [
+    PARAM_NAMES_QUANTITIES = [
         'st_rad',
         'st_mass',
         'st_teff',
@@ -104,12 +120,91 @@ class ParamFiller:
         'pl_eqt',
     ]
 
-    param_names_strings = [
+    PARAM_NAMES_STRINGS = [
         'st_spectype'
     ]
 
-    param_names = param_names_quantities + param_names_strings
+    PARAM_NAMES = PARAM_NAMES_QUANTITIES + PARAM_NAMES_STRINGS
 
+    PARAM_METADATA = {
+        'st_rad':      ('star_radius', 'Stellar radius [R_sun]'),
+        'st_mass':     ('star_mass', 'Stellar mass [M_sun]'),
+        'st_teff':     ('star_effective_temperature', 'Stellar effective temperature [K]'),
+        'st_logg':     ('star_logg', 'Stellar log surface gravity [log(cm/s^2)]'),
+        'st_met':      ('star_metallicity', 'Stellar metallicity [Fe/H]'),
+        'st_lum':      ('star_luminosity', 'Stellar luminosity [L_sun]'),
+        'sy_vmag':     ('vmag', 'Visual band magnitude [mag]'),
+        'sy_kmag':     ('kmag', '2MASS K-band magnitude [mag]'),
+        'sy_dist':     ('distance', 'Distance [pc]'),
+        'pl_insol':    ('planet_flux', 'Planet insolation flux [S_earth]'),
+        'pl_eqt':      ('planet_equilibrium_temperature', 'Planet equilibrium temperature [K]'),
+        'st_spectype': ('star_spectral_type', 'Stellar spectral type')
+    }
+    
+
+    def __init__(self, sources: list[ParamSource], msini_sin_min: float = 0.3):
+        """Initialise the merger with an ordered list of parameter sources.
+
+        Parameters
+        ----------
+        sources : list of `~crossmatching.param_sources.base.ParamSource`
+            Priority-ordered    parameter sources.  For each  parameter the 
+            first source that provides a non-null value wins.
+        msini_sin_min : float, optional
+            Minimum sin(inclination) assumed when converting msini to a
+            radius upper bound via the Chen & Kipping relation.  Default
+            0.5, corresponding to an 86.6 % confidence-interval upper
+            bound on the true mass under an isotropic inclination prior
+            (Stevens & Gaudi 2013).
+        """
+        self.sources = sources
+        self.msini_sin_min = msini_sin_min
+
+
+    def _populate_quantity_columns(
+        self,
+        result_table,
+        param_names: list[str], 
+        params_q: dict, 
+        resolved_cols: dict, 
+        upper_suffix: str, 
+        lower_suffix: str
+    ) -> None: 
+        """
+        Dynamically populate an Astropy table with quantity columns and their errors.
+
+        Parameters
+        ----------
+        result_table : Table
+            The Astropy table to be enriched in-place.
+        param_names : list
+            List of parameter keys (e.g., 'st_rad') to process.
+        params_q : dict
+            Dictionary mapping parameter keys to lists of parameter objects.
+        resolved_cols : dict
+            Mapping of canonical parameter names to actual column names in the table.
+        upper_suffix : str
+            Suffix to append to the upper error column name.
+        lower_suffix : str
+            Suffix to append to the lower error column name.
+
+        Returns
+        -------
+        None
+            The `result_table` is modified in-place.
+        """
+
+        for key in param_names:
+            canonical_name, desc = self.PARAM_METADATA[key]
+            col = resolved_cols[canonical_name]
+            
+            p_val, p_mask, p_err1, p_err2, p_src = _extract_param_arrays(params_q[key])
+            
+            result_table[col] = MaskedColumn(p_val, mask=p_mask, name=col, description=desc)
+            result_table[f'{col}_src'] = p_src
+            result_table[f'{col}_{upper_suffix}'] = _mc(p_err1, f'{col}_{upper_suffix}')
+            result_table[f'{col}_{lower_suffix}'] = _mc(p_err2, f'{col}_{lower_suffix}')
+        
 
     def _merge_values(
         self,
@@ -174,20 +269,20 @@ class ParamFiller:
             merged_err1: dict = {}
             merged_err2: dict = {}
             for source in self.sources:
-                d = source.get(
+                data = source.get(
                     row,
                     input_starname_key=input_starname_key,
                     id_supplier=id_supplier,
                     alternate_ids=alternate_ids,
                 )
-                for key, value in d.items():
+                for key, value in data.items():
                     if key.endswith(f'_{upper_error_suffix}') or key.endswith(f'_{lower_error_suffix}'):
                         continue
                     if key not in merged:
                         merged[key]  = value
                         merged_src[key]  = source.source_name
-                        merged_err1[key] = d.get(f'{key}_{upper_error_suffix}')
-                        merged_err2[key] = d.get(f'{key}_{lower_error_suffix}')
+                        merged_err1[key] = data.get(f'{key}_{upper_error_suffix}')
+                        merged_err2[key] = data.get(f'{key}_{lower_error_suffix}')
 
             def _bind(param):
                 short = _SHORT.get(param, param)
@@ -212,9 +307,9 @@ class ParamFiller:
                             return True
                 return False
 
-            for param in self.param_names_quantities:
+            for param in self.PARAM_NAMES_QUANTITIES:
                 _bind(param)
-            for param in self.param_names_strings:
+            for param in self.PARAM_NAMES_STRINGS:
                 _bind(param)
 
             if not disable_calculations:
@@ -277,8 +372,8 @@ class ParamFiller:
         vmag_key: str = None,
         kmag_key: str = None,
         distance_key: str = None,
-        upper_error_suffix: str | None = None,
-        lower_error_suffix: str | None = None,
+        upper_error_suffix: str  = "err1",
+        lower_error_suffix: str  = "err2",
         input_starname_key: str | None = None,
         id_supplier: IdSupplierBase | None = None,
         alternate_ids: Table | None = None,
@@ -317,17 +412,17 @@ class ParamFiller:
         table : Table
             The input catalog table to enrich.
         planet_radius_key : str, optional
-            Column name for planet radius (default: 'r').
+            Column name for planet radius 
         planet_flux_key : str, optional
             Column name for planet insolation flux.
         planet_equilibrium_temperature_key : str, optional
             Column name for planet equilibrium temperature.
         semi_major_axis_key : str, optional
-            Column name for semi-major axis (default: 'a').
+            Column name for semi-major axis
         period_key : str, optional
-            Column name for orbital period (default: 'p').
+            Column name for orbital period 
         msini_key : str, optional
-            Column name for minimum mass $M \sin i$ (default: 'msini').
+            Column name for minimum mass $M \sin i$
         star_spectral_type_key : str, optional
             Column name for stellar spectral type.
         star_radius_key : str, optional
@@ -348,9 +443,9 @@ class ParamFiller:
             Column name for K-band magnitude.
         distance_key : str, optional
             Column name for distance.
-        upper_error_suffix : str, optional
+        upper_error_suffix : str = "err1"
             Suffix for upper error columns. Defaults to config enrichment value.
-        lower_error_suffix : str, optional
+        lower_error_suffix : str = "err2"
             Suffix for lower error columns. Defaults to config enrichment value.
         input_starname_key : str, optional
             Column name used to identify the host star for lookups.
@@ -366,24 +461,16 @@ class ParamFiller:
         Table
             A new table containing the combined and physically derived parameters.
         """
-        # Set default suffixes from config if not provided
-        if upper_error_suffix is None:
-            upper_error_suffix = config.enrichment['source_err_suffix']
-        if lower_error_suffix is None:
-            lower_error_suffix = config.enrichment['dependent_err_suffix']
-
         n = len(table)
 
-        # ---------------------------------------------------------------------
-        # 1 Fold and resolve all _key parameters (except input_starname_key)
-        # ---------------------------------------------------------------------
-        # Start with default column names
+        # NOTE: while these dicts are quite verbose,
+        # they are explicitely stated to help with IDE autocompletion when accesing the resulting table
         resolved_cols = {
-            'planet_radius': 'r',
+            'planet_radius': 'pl_rad',
             'planet_flux': 'pl_insol',
             'planet_equilibrium_temperature': 'pl_eqt',
-            'semi_major_axis': 'a',
-            'period': 'p',
+            'semi_major_axis': 'semi_major_axis',
+            'period': 'period',
             'msini': 'msini',
             'star_radius': 'st_rad',
             'star_mass': 'st_mass',
@@ -421,15 +508,10 @@ class ParamFiller:
         for k, v in provided_args.items():
             if v is not None:
                 resolved_cols[k] = v
-        for k, v in override_keys.items():
-            if v is not None and k.endswith('_key'):
-                canonical_key = k[:-4]
-                if canonical_key in resolved_cols:
-                    resolved_cols[canonical_key] = v
 
         # Set up quantities and strings mapping
-        params_q = {key: [ParamQty() for _ in range(n)] for key in self.param_names_quantities}
-        params_s = {key: [ParamStr() for _ in range(n)] for key in self.param_names_strings}
+        params_q = {key: [ParamQty() for _ in range(n)] for key in self.PARAM_NAMES_QUANTITIES}
+        params_s = {key: [ParamStr() for _ in range(n)] for key in self.PARAM_NAMES_STRINGS}
 
         internal_to_canonical = {
             'st_rad': 'star_radius',
@@ -447,7 +529,7 @@ class ParamFiller:
         }
 
         # Pre-load input table values as highest-priority source for each parameter
-        for param_name in self.param_names_quantities:
+        for param_name in self.PARAM_NAMES_QUANTITIES:
             canonical_name = internal_to_canonical[param_name]
             col_name = resolved_cols[canonical_name]
             if col_name in table.colnames:
@@ -458,7 +540,7 @@ class ParamFiller:
                     p[idx].mask = bool(msk)
                     p[idx].src = 'input'
 
-        for param_name in self.param_names_strings:
+        for param_name in self.PARAM_NAMES_STRINGS:
             canonical_name = internal_to_canonical[param_name]
             col_name = resolved_cols[canonical_name]
             if col_name in table.colnames:
@@ -475,83 +557,23 @@ class ParamFiller:
             input_starname_key, id_supplier, alternate_ids, disable_calculations
         )
 
-        def _mc(arr, name, desc=''):
-            return MaskedColumn(arr, mask=~np.isfinite(arr), name=name, description=desc)
-
+        result = table.copy()
         if disable_calculations:
-            result = table.copy()
-            for default_col, key, desc in (
-                ('st_teff', 'st_teff',   ''),
-                ('st_rad',  'st_rad',    ''),
-                ('st_mass', 'st_mass',   ''),
-                ('st_logg', 'st_logg',   'Stellar log surface gravity [log(cm/s^2)]'),
-                ('st_met',  'st_met',    'Stellar metallicity [Fe/H]'),
-                ('st_lum',  'st_lum',    'Stellar luminosity [L_sun]'),
-                ('sy_vmag', 'sy_vmag',   ''),
-                ('sy_kmag', 'sy_kmag',   '2MASS K-band magnitude [mag]'),
-                ('sy_dist', 'sy_dist',   ''),
-                ('pl_eqt',  'pl_eqt',    'Planet equilibrium temperature [K]'),
-                ('pl_insol', 'pl_insol', 'Planet insolation flux [S_earth]'),
-            ):
-                canonical_name = internal_to_canonical[key]
-                col = resolved_cols[canonical_name]
-                p = params_q[key]
-                p_val = np.array([x.val for x in p])
-                p_mask = np.array([x.mask for x in p])
-                p_err1 = np.array([x.err1 for x in p])
-                p_err2 = np.array([x.err2 for x in p])
-                p_src = [x.src for x in p]
-                result[col] = MaskedColumn(p_val, mask=p_mask, name=col, description=desc)
-                result[f'{col}_src'] = p_src
-                result[f'{col}_{upper_error_suffix}'] = _mc(p_err1, f'{col}_{upper_error_suffix}')
-                result[f'{col}_{lower_error_suffix}'] = _mc(p_err2, f'{col}_{lower_error_suffix}')
-
-            # For strings
-            key = 'st_spectype'
-            canonical_name = internal_to_canonical[key]
-            col = resolved_cols[canonical_name]
-            p = params_s[key]
-            result[col] = [x.val for x in p]
-            result[f'{col}_src'] = [x.src for x in p]
-
+            self._populate_quantity_columns(result, self.PARAM_NAMES_QUANTITIES, params_q, resolved_cols, upper_error_suffix, lower_error_suffix)
+            for key in self.PARAM_NAMES_STRINGS:
+                col = resolved_cols[self.PARAM_METADATA[key][0]]
+                result[col] = [x.val for x in params_s[key]]
+                result[f'{col}_src'] = [x.src for x in params_s[key]]
             return result
 
-        # Restore shortcut references needed for remaining column-level computations
-        rad = params_q['st_rad']
-        mass = params_q['st_mass']
-        teff = params_q['st_teff']
-        spec_arr = params_s['st_spectype']
-
-        st_spectype = [
-            spectype_display(spec_arr[i].val, teff[i].val if not teff[i].mask else 0.0)
-            for i in range(n)
-        ]
-
         # Convert lists of ParamQty to numpy arrays for vectorized calculations
-        rad_val = np.array([x.val for x in rad])
-        rad_mask = np.array([x.mask for x in rad])
-        rad_err1 = np.array([x.err1 for x in rad])
-        rad_err2 = np.array([x.err2 for x in rad])
-        rad_src = [x.src for x in rad]
+        rad_val, rad_mask, rad_err1, rad_err2, rad_src = _extract_param_arrays(params_q['st_rad'])
+        mass_val, mass_mask, mass_err1, mass_err2, mass_src = _extract_param_arrays(params_q['st_mass'])
+        teff_val, teff_mask, teff_err1, teff_err2, teff_src = _extract_param_arrays(params_q['st_teff'])
+        lum_val, lum_mask, lum_err1, lum_err2, lum_src = _extract_param_arrays(params_q['st_lum'])
 
-        mass_val = np.array([x.val for x in mass])
-        mass_mask = np.array([x.mask for x in mass])
-        mass_err1 = np.array([x.err1 for x in mass])
-        mass_err2 = np.array([x.err2 for x in mass])
-        mass_src = [x.src for x in mass]
-
-        teff_val = np.array([x.val for x in teff])
-        teff_mask = np.array([x.mask for x in teff])
-        teff_err1 = np.array([x.err1 for x in teff])
-        teff_err2 = np.array([x.err2 for x in teff])
-        teff_src = [x.src for x in teff]
-
-        src_lum = params_q['st_lum']
-        src_lum_val = np.array([x.val for x in src_lum])
-        src_lum_mask = np.array([x.mask for x in src_lum])
-        src_lum_err1 = np.array([x.err1 for x in src_lum])
-        src_lum_err2 = np.array([x.err2 for x in src_lum])
-        src_lum_src = [x.src for x in src_lum]
+        spec_arr = params_s['st_spectype']
+        st_spectype = [spectype_display(spec_arr[i].val, teff_val[i] if not teff_mask[i] else 0.0) for i in range(n)]
 
         # ── r_valid: gates msini bounds (callers convert r → R_earth via R_JUP_TO_EARTH) ──────────
         r_vals, r_orig_mask = _try_get_column(table, resolved_cols['planet_radius'])
@@ -572,10 +594,10 @@ class ParamFiller:
         computed_lum_mask = rad_mask | teff_mask
         computed_lum = np.where(~computed_lum_mask, rad_val ** 2 * (teff_val / T_SUN) ** 4, np.nan)
 
-        lum      = np.where(~src_lum_mask, src_lum_val, computed_lum)
-        lum_mask = src_lum_mask & computed_lum_mask
+        lum      = np.where(~lum_mask, lum_val, computed_lum)
+        lum_mask = lum_mask & computed_lum_mask
         st_lum_src = [
-            src_lum_src[i] if not src_lum_mask[i] else
+            lum_src[i] if not lum_mask[i] else
             (f"r:{rad_src[i]} teff:{teff_src[i]}" if not computed_lum_mask[i] else '')
             for i in range(n)
         ]
@@ -598,8 +620,8 @@ class ParamFiller:
             lum_err1_prop = np.where(has_prop_err1, np.abs(computed_lum) * np.sqrt(lum_rel1_sq), np.nan)
             lum_err2_prop = np.where(has_prop_err2, np.abs(computed_lum) * np.sqrt(lum_rel2_sq), np.nan)
 
-        lum_err1 = np.where(~src_lum_mask, src_lum_err1, lum_err1_prop)
-        lum_err2 = np.where(~src_lum_mask, src_lum_err2, lum_err2_prop)
+        lum_err1 = np.where(~lum_mask, lum_err1, lum_err1_prop)
+        lum_err2 = np.where(~lum_mask, lum_err2, lum_err2_prop)
 
         # ── semi-major axis with Kepler fallback ──────────────────────────────
         a_vals, a_orig_mask = _try_get_column(table, resolved_cols['semi_major_axis'])
@@ -717,39 +739,21 @@ class ParamFiller:
         spectral_category = [classify_spectral_type(s) for s in st_spectype]
         spec_src = [spec_arr[i].src for i in range(n)]
 
-        result = table.copy()
-        for default_col, key, desc in (
-            ('st_teff', 'st_teff',   ''),
-            ('st_rad',  'st_rad',    ''),
-            ('st_mass', 'st_mass',   ''),
-            ('st_logg', 'st_logg',   'Stellar log surface gravity [log(cm/s^2)]'),
-            ('st_met',  'st_met',    'Stellar metallicity [Fe/H]'),
-            ('st_lum',  'st_lum',    'Stellar luminosity [L_sun]'),
-            ('sy_vmag', 'sy_vmag',   ''),
-            ('sy_kmag', 'sy_kmag',   '2MASS K-band magnitude [mag]'),
-            ('sy_dist', 'sy_dist',   ''),
-            ('pl_eqt',  'pl_eqt',    'Planet equilibrium temperature [K]'),
-            ('pl_insol', 'pl_insol', 'Planet insolation flux [S_earth]'),
-        ):
-            canonical_name = internal_to_canonical[key]
-            col = resolved_cols[canonical_name]
-            p = params_q[key]
-            p_val = np.array([x.val for x in p])
-            p_mask = np.array([x.mask for x in p])
-            p_err1 = np.array([x.err1 for x in p])
-            p_err2 = np.array([x.err2 for x in p])
-            p_src = [x.src for x in p]
-            result[col] = MaskedColumn(p_val, mask=p_mask, name=col, description=desc)
-            result[f'{col}_src'] = p_src
-            result[f'{col}_{upper_error_suffix}'] = _mc(p_err1, f'{col}_{upper_error_suffix}')
-            result[f'{col}_{lower_error_suffix}'] = _mc(p_err2, f'{col}_{lower_error_suffix}')
+        self._populate_quantity_columns(
+            result, self.PARAM_NAMES_QUANTITIES, params_q, resolved_cols, 
+            upper_error_suffix, lower_error_suffix
+        )        
+        
+        def _mc(arr, name, desc=''):
+            return MaskedColumn(arr, mask=~np.isfinite(arr), name=name, description=desc)
+
 
         result['st_spectype']        = st_spectype
         result['st_spectype_src']    = spec_src
         result['st_lum']             = MaskedColumn(lum,    mask=lum_mask,     name='st_lum',
                                                     description='Stellar luminosity [L_sun]')
-        result[f'st_lum_{upper_error_suffix}']        = _mc(lum_err1,   f'st_lum_{upper_error_suffix}',  'Luminosity upper 1σ [L_sun]')
-        result[f'st_lum_{lower_error_suffix}']        = _mc(lum_err2,   f'st_lum_{lower_error_suffix}',  'Luminosity lower 1σ [L_sun]')
+        result[f'st_lum_{upper_error_suffix}']  = _mc(lum_err1,   f'st_lum_{upper_error_suffix}',  'Luminosity upper 1σ [L_sun]')
+        result[f'st_lum_{lower_error_suffix}']  = _mc(lum_err2,   f'st_lum_{lower_error_suffix}',  'Luminosity lower 1σ [L_sun]')
         result['st_lum_src']         = st_lum_src
         result['r_lower_bound']      = _mc(r_lower_bound_arr, 'r_lower_bound',
                                            'Min estimated planet radius from msini [R_earth]')

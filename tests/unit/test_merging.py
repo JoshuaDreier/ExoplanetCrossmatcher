@@ -19,8 +19,8 @@ def test_merge_values_priority():
     
     t = Table({'id': [1, 2]})
     
-    params_q = {key: [ParamQty() for _ in range(len(t))] for key in filler.param_names_quantities}
-    params_s = {key: [ParamStr() for _ in range(len(t))] for key in filler.param_names_strings}
+    params_q = {key: [ParamQty() for _ in range(len(t))] for key in filler.PARAM_NAMES_QUANTITIES}
+    params_s = {key: [ParamStr() for _ in range(len(t))] for key in filler.PARAM_NAMES_STRINGS}
     
     filler._merge_values(t, params_q, params_s, 'err1', 'err2')
     
@@ -46,8 +46,8 @@ def test_merge_values_with_string_params():
     filler = ParamFiller([s1])
     t = Table({'id': [1, 2]})
     
-    params_q = {key: [ParamQty() for _ in range(len(t))] for key in filler.param_names_quantities}
-    params_s = {key: [ParamStr() for _ in range(len(t))] for key in filler.param_names_strings}
+    params_q = {key: [ParamQty() for _ in range(len(t))] for key in filler.PARAM_NAMES_QUANTITIES}
+    params_s = {key: [ParamStr() for _ in range(len(t))] for key in filler.PARAM_NAMES_STRINGS}
     
     filler._merge_values(t, params_q, params_s, 'err1', 'err2')
     
