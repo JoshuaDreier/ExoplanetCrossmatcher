@@ -2,7 +2,7 @@ import pyvo
 from astropy.table import Table
 import numpy as np
 
-from crossmatching.enrichment.param_sources.base import ParamSource, _safe_float, _safe_str, _build_nea_style_lookup
+from crossmatching.enrichment.param_sources.base import ParamSource, _build_nea_style_lookup
 
 
 class SimbadParamSource(ParamSource):

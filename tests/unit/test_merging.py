@@ -1,6 +1,7 @@
 import numpy as np
 from astropy.table import Table
-from crossmatching.enrichment.merger import ParamFiller, ParamQty, ParamStr
+from crossmatching.enrichment.merger import ParamFiller
+from crossmatching.enrichment.inference import ParamQty, ParamStr
 
 class MockSource:
     def __init__(self, name, data):

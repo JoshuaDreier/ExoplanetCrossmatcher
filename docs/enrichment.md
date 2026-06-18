@@ -247,3 +247,69 @@ If all source values are masked, the final value is masked.
   $$R_{\text{lower}} = f_{\text{Chen-Kipping}}(M \sin i)$$
 * **Upper Bound**:
   $$R_{\text{upper}} = f_{\text{Chen-Kipping}}\left(\frac{M \sin i}{\sin i_{\text{min}}}\right) \quad \text{where } \sin i_{\text{min}} = 0.3$$
+
+
+
+
+
+
+
+  ----
+  # Reference: Derived Parameter Source (`src`) Strings and Formulations
+
+Below is the list of all possible `src` strings for the derived quantities in the stellar/planetary parameter enrichment pipeline.
+
+---
+
+## 1. Stellar Effective Temperature (`st_teff`)
+
+| Source String (`src`)                     | Derivation / Formula                                                                     | Input Quantities                                                                 | Meaning / Notes                                                                                                                                      |
+| :---------------------------------------- | :--------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SB_derived(rad:<rad_src> lum:<lum_src>)` | Stefan-Boltzmann Law:<br>$$T_{\text{eff}} = T_{\odot} \left(\frac{L}{R^2}\right)^{1/4}$$ | $R$ (Stellar Radius)<br>$L$ (Stellar Luminosity)<br>$T_{\odot} \approx 5778.0$ K | Physical derivation when both radius and luminosity are successfully matched but temperature is missing.                                             |
+| `spectype_derived(spec:<spec_src>)`       | Inverted Spectral Class-to-Teff mapping via `spectype_to_teff()`.                        | $SpT$ (Stellar Spectral Type)                                                    | Interpolates spectral classifications based on standard astronomical temperature relations for main-sequence classes (O, B, A, F, G, K, M, L, T, Y). |
+
+---
+
+## 2. Stellar Radius (`st_rad`)
+
+| Source String (`src`) | Derivation / Formula | Input Quantities | Meaning / Notes |
+| :--- | :--- | :--- | :--- |
+| `logg_derived(mass:<mass_src> logg:<logg_src>)` | Gravity-Mass relation:<br>$$R = 10^{0.5 \left(4.43797 + \log_{10} M - \log g\right)}$$ | $M$ (Stellar Mass)<br>$\log g$ (Surface Gravity) | Physical derivation using solar surface gravity $\log g_{\odot} \approx 4.43797$ dex. |
+| `SB_derived(lum:<lum_src> teff:<teff_src>)` | Stefan-Boltzmann Law:<br>$$R = \sqrt{L} \left(\frac{T_{\odot}}{T_{\text{eff}}}\right)^2$$ | $L$ (Stellar Luminosity)<br>$T_{\text{eff}}$ (Effective Temp) | Physical derivation. |
+| `mann_mks(kmag:<kmag_src>)` | Mann et al. 2015 polynomial:<br>$$R = f(M_{K_s}, [\text{Fe/H}])$$ | $K_s$ (2MASS Magnitude)<br>$d$ (Distance)<br>$[\text{Fe/H}]$ (Metallicity) | Empirical absolute K-band magnitude relation calibrated specifically for K7 to M7 dwarfs (scatter ~3%). *Ref: Mann et al. (2015) ApJ, 804, 64.* |
+| `torres(teff:<teff_src> logg:<logg_src>)` | Torres et al. 2010 polynomial:<br>$$\log R = f(\log T_{\text{eff}}, \log g, [\text{Fe/H}])$$ | $T_{\text{eff}}$<br>$\log g$<br>$[\text{Fe/H}]$ | Polynomial calibration for FGK main-sequence stars (scatter ~3%). *Ref: Torres et al. (2010) A&ARv, 18, 67.* |
+| `mann_teff(teff:<teff_src>)` | Mann et al. 2015 Teff-only polynomial:<br>$$R = f(T_{\text{eff}}, [\text{Fe/H}])$$ | $T_{\text{eff}}$<br>$[\text{Fe/H}]$ | Temperature-based empirical radius model for late-type M dwarfs. *Ref: Mann et al. (2015) ApJ, 804, 64.* |
+| `ms(teff:<teff_src>)` | Zero-Age Main Sequence (ZAMS) power law:<br>$$R \propto T_{\text{eff}}^{\alpha}$$ | $T_{\text{eff}}$<br>$SpT$ (Spectral Type) | General power-law fallback representing a standard dwarf sequence. |
+
+---
+
+## 3. Stellar Mass (`st_mass`)
+
+| Source String (`src`) | Derivation / Formula | Input Quantities | Meaning / Notes |
+| :--- | :--- | :--- | :--- |
+| `logg_derived(rad:<rad_src> logg:<logg_src>)` | Gravity-Radius relation:<br>$$M = 10^{\log g - 4.43797 + 2\log_{10} R}$$ | $R$ (Stellar Radius)<br>$\log g$ (Surface Gravity) | Physical derivation of mass using the solar surface gravity scaling relations. |
+
+---
+
+## 4. Stellar Luminosity (`st_lum`)
+
+| Source String (`src`) | Derivation / Formula | Input Quantities | Meaning / Notes |
+| :--- | :--- | :--- | :--- |
+| `r:<rad_src> teff:<teff_src>` | Stefan-Boltzmann Equation:<br>$$L = R^2 \left(\frac{T_{\text{eff}}}{T_{\odot}}\right)^4$$ | $R$ (Stellar Radius)<br>$T_{\text{eff}}$ (Effective Temp) | Classical blackbody stellar luminosity calculation normalized to Solar units. |
+
+---
+
+## 5. Insolation Flux (`pl_insol`)
+
+| Source String (`src`) | Derivation / Formula | Input Quantities | Meaning / Notes |
+| :--- | :--- | :--- | :--- |
+| `r:<rad_src> teff:<teff_src> a:<a_src>` | Insolation scaling:<br>$$S_{\text{eff}} = \frac{L}{a^2} = \frac{R^2 (T_{\text{eff}}/T_{\odot})^4}{a^2}$$ | $R$ (Stellar Radius)<br>$T_{\text{eff}}$ (Effective Temp)<br>$a$ (Semi-major axis in au) | Computes incoming flux relative to Earth's solar insolation. |
+| `derived(eqt:<eqt_src>)` | Insolation-to-temperature inverse relation:<br>$$S_{\text{eff}} = \left(\frac{T_{\text{eq}}}{254.793}\right)^4$$ | $T_{\text{eq}}$ (Equilibrium Temp) | Reconstructed insolation value derived from equilibrium temperature under a Bond Albedo assumption $A_B = 0.3$. |
+
+---
+
+## 6. Equilibrium Temperature (`pl_eqt`)
+
+| Source String (`src`) | Derivation / Formula | Input Quantities | Meaning / Notes |
+| :--- | :--- | :--- | :--- |
+| `derived(insol:<insol_src>)` | Equilibrium Temperature equation:<br>$$T_{\text{eq}} \approx 254.793 \cdot S_{\text{eff}}^{0.25}$$ | $S_{\text{eff}}$ (Insolation Flux) | Calculated fallback assuming a standard Bond Albedo $A_B = 0.3$. |

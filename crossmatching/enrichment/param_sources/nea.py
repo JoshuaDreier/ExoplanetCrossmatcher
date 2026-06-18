@@ -1,8 +1,7 @@
 import pyvo
 from astropy.table import Table
 
-from crossmatching.enrichment.param_sources.base import ParamSource, _build_nea_style_lookup, _safe_err_pair, _safe_float, _safe_str
-
+from crossmatching.enrichment.param_sources.base import ParamSource, _build_nea_style_lookup
 
 class NeaParamSource(ParamSource):
     """Stellar and planetary params from the NASA Exoplanet Archive (pscomppars).
