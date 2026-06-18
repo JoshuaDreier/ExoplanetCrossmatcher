@@ -70,13 +70,18 @@ def standardize_spectral_type(spectype: str) -> str:
                 if am_plain:
                     s = am_plain.group(1)
 
-    # 3. For binary / composite systems take only the primary component.
+    # 3. Normalise slash-prefix variants before the binary split so that
+    #    strings like 's/sdM5' are not mistaken for a binary system.
+    #    e.g. s/sd → sd,  d/sd → sd
+    s = re.sub(r'^(?:s|d)/sd', 'sd', s, flags=re.I)
+
+    # 4. For binary / composite systems take only the primary component.
     #    Example: G9III+A7.5  →  G9III,   M2.5V/M3V  →  M2.5V
     s = re.split(r'[+/]', s)[0].strip()
 
-    # 4. Strip subdwarf / dwarf prefixes.
+    # 5. Strip subdwarf / dwarf prefixes.
     #    Example: sdM3.5  →  M3.5,   esdM0  →  M0,   dM4.5e  →  M4.5e
-    s = re.sub(r'^(?:esd|usd|d/sd|sd|d)[\s:]*', '', s, flags=re.I)
+    s = re.sub(r'^(?:esd|usd|d/sd|s/sd|sd|d)[\s:]*', '', s, flags=re.I)
 
     # 5. Remove parenthesised qualifiers: (n), (e), (k), …
     s = re.sub(r'\(.*?\)', '', s)
@@ -197,6 +202,8 @@ def spectype_to_teff(spectype: str) -> float:
             https://www.pas.rochester.edu/~emamajek/EEM_dwarf_UBVIJHK_colors_Teff.txt
     
     """
+    if not standardize_spectral_type(spectype):
+        return np.nan
     return float(np.interp(_parse_spt(spectype), _nums, _teffs))
  
  

@@ -32,6 +32,7 @@ from crossmatching.enrichment.param_sources import (
 )
 
 __all__ = [
+    'standardize_spectral_type'
     'classify_spectral_type',
     'teff_to_spectype',
     'spectype_display',

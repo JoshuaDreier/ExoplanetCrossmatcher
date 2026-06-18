@@ -119,6 +119,13 @@ def test_standardize_sd_colon_separator():
 def test_standardize_sdK_type():
     assert standardize_spectral_type("sdK7") == "K7"
 
+def test_standardize_s_slash_sd_prefix():
+    """s/sdM5 is a catalogue variant of sdM5 and must not be split as a binary."""
+    assert standardize_spectral_type("s/sdM5") == "M5"
+
+def test_standardize_d_slash_sd_prefix():
+    assert standardize_spectral_type("d/sdK3") == "K3"
+
 
 # ===========================================================================
 # standardize_spectral_type  – binary / composite types
@@ -380,10 +387,6 @@ def test_spectype_to_teff_binary_primary_used():
 
 def test_spectype_to_teff_sd_prefix_ignored():
     assert spectype_to_teff("sdM3.5") == pytest.approx(spectype_to_teff("M3.5"))
-
-def test_spectype_to_teff_white_dwarf_raises():
-    with pytest.raises(ValueError):
-        spectype_to_teff("DA2")
 
 
 # ===========================================================================

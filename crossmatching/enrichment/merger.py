@@ -22,7 +22,6 @@ from crossmatching.enrichment.inference import (
     ParamStr,
 )
 
-_LOG_G_SUN = 4.438    # log10(g_sun / cm s-2), IAU 2015 nominal solar values
 _M_JUP_TO_EARTH = u.M_jup.to(u.M_earth)  # ~317.83
 R_JUP_TO_EARTH  = u.R_jup.to(u.R_earth)  # ~11.21; exported for callers that need r in R_earth
 

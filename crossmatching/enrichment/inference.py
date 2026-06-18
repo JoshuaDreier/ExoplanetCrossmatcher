@@ -110,13 +110,12 @@ def infer_star_teff(
     # 2. Try estimation from spectral type
     elif not spectype.mask:
         t = spectype_to_teff(spectype.val)
-        if t > 0:
-            t_min, t_max = get_spectral_class_range(spectype.val)
-            if t_min > 0 and t_max > 0:
-                err1 = t_max - t
-                err2 = t - t_min
-            else:
-                err1 = err2 = 0.0
+        if not t:
+            return teff
+        err1 = err2 = 0.0
+        t_min, t_max = get_spectral_class_range(spectype.val)
+        err1 = t_max - t
+        err2 = t - t_min                
         return ParamQty(
             val=t,
             mask=False,
@@ -126,6 +125,8 @@ def infer_star_teff(
         )
     return teff
 
+
+_LOG_G_SUN = 4.438 # log10(g_sun / cm s-2), IAU 2015 nominal solar values
 
 def infer_star_radius(
     rad: ParamQty,
@@ -143,7 +144,7 @@ def infer_star_radius(
     Attempts to derive the radius in order of preference:
     1. Exact physical relation from mass and log(g):
        
-       $$ R = 10^{0.5(4.43797 + \log_{10} M - \log g)} $$
+       $$ R = 10^{0.5(\log g_\odot + \log_{10} M_* - \log g)}  = \sqrt{  \dfrac{g_{\odot}}{g}M_{*}}$$
        
     2. Exact physical relation from luminosity and Teff (Stefan-Boltzmann):
        
@@ -180,9 +181,9 @@ def infer_star_radius(
     if not rad.mask:
         return rad
 
-    # 1. Try exact physical logg relation first
+    # Try exact physical logg relation first
     if not logg.mask and not mass.mask:
-        r = 10 ** (0.5 * (4.43797 + np.log10(mass.val) - logg.val))
+        r = 10 ** (0.5 * (_LOG_G_SUN + np.log10(mass.val) - logg.val))
         
         # Error propagation
         t_m_up = _safe_err_sq(mass.err1, mass.val, 0.5)
@@ -190,8 +191,8 @@ def infer_star_radius(
         t_g_up = _safe_err_sq(logg.err1, coeff=0.5 * np.log(10.0))
         t_g_dn = _safe_err_sq(logg.err2, coeff=0.5 * np.log(10.0))
         
-        err1 = r * np.sqrt(t_m_up + t_g_dn) if (t_m_up > 0 or t_g_dn > 0) else 0.0
-        err2 = r * np.sqrt(t_m_dn + t_g_up) if (t_m_dn > 0 or t_g_up > 0) else 0.0
+        err1 = r * np.sqrt(t_m_up + t_g_dn) 
+        err2 = r * np.sqrt(t_m_dn + t_g_up) 
         return ParamQty(
             val=r,
             mask=False,
@@ -200,18 +201,20 @@ def infer_star_radius(
             err2=err2
         )
         
-    # 1.5. Try exact physical Stefan-Boltzmann relation next
+    # Try exact physical Stefan-Boltzmann relation next
     elif not lum.mask and not teff.mask and lum.val > 0 and teff.val > 0:
+        # R = \sqrt{L}\left(\frac{T_*}{T}\right)^2
         r = np.sqrt(lum.val) * (T_SUN / teff.val) ** 2
         
         # Error propagation
+        # \sigma_R = R\sqrt{\frac{1}{4}\left(\frac{\sigma_L}{L}\right)^2 + 4\left(\frac{\sigma_T}{T}\right)^2}
         t_l_up = _safe_err_sq(lum.err1, lum.val, 0.5)
         t_l_dn = _safe_err_sq(lum.err2, lum.val, 0.5)
         t_t_up = _safe_err_sq(teff.err1, teff.val, 2.0)
         t_t_dn = _safe_err_sq(teff.err2, teff.val, 2.0)
         
-        err1 = r * np.sqrt(t_l_up + t_t_dn) if (t_l_up > 0 or t_t_dn > 0) else 0.0
-        err2 = r * np.sqrt(t_l_dn + t_t_up) if (t_l_dn > 0 or t_t_up > 0) else 0.0
+        err1 = r * np.sqrt(t_l_up + t_t_dn)
+        err2 = r * np.sqrt(t_l_dn + t_t_up)
         return ParamQty(
             val=r,
             mask=False,
@@ -220,7 +223,7 @@ def infer_star_radius(
             err2=err2
         )
 
-    # 2. Try empirical/statistical estimations from teff
+    # Try empirical/statistical estimations from teff
     elif not teff.mask:
         teff_val = teff.val
         logg_val = logg.val if not logg.mask else None
@@ -229,6 +232,7 @@ def infer_star_radius(
         dist_val = dist.val if not dist.mask else None
 
         r = 0.0
+        err1 = err2 = 0
         r_tag = ''
 
         # 1. Mann 2015 M_Ks polynomial — best for K7–M7 (~3% scatter)
@@ -237,40 +241,33 @@ def infer_star_radius(
             if 4.0 <= mks <= 10.5:
                 r = _mann_mks_radius(mks, met_val)
                 r_tag = f"mann_mks(kmag:{kmag.src})"
+                err1 = err2 = 0.029 * r
 
         # 2. Torres 2010 — best for FGK with log g (~3% scatter)
         if r == 0.0 and logg_val is not None and 3900 < teff_val < 8500:
             r = _torres_radius(teff_val, logg_val, met_val)
             r_tag = f"torres(teff:{teff.src} logg:{logg.src})"
+            err1 = err2 = 0.030 * r
 
         # 3. Mann 2015 Teff polynomial — better than power law for M dwarfs
         if r == 0.0 and teff_val < 4000:
             r = _mann_teff_radius(teff_val, met_val)
             r_tag = f"mann_teff(teff:{teff.src})"
+            frac = 0.093 if (met_val is not None and np.isfinite(met_val)) else 0.134
+            err1 = err2 = frac * r
 
         # 4. ZAMS power‑law — last resort
         if r == 0.0:
             r = ms_radius_from_teff(teff_val, spectype.val)
             r_tag = f"ms(teff:{teff.src})"
+            exp = _zams_exponent(teff_val, spectype.val)
+            coeff = exp * r / teff_val
+            if np.isfinite(teff.err1):
+                err1 = coeff * teff.err1
+            if np.isfinite(teff.err2):
+                err2 = coeff * teff.err2
 
         if r > 0:
-            err1 = err2 = np.nan
-            if r_tag.startswith('mann_mks'):
-                err1 = err2 = 0.029 * r
-            elif r_tag.startswith('torres'):
-                err1 = err2 = 0.030 * r
-            elif r_tag.startswith('mann_teff'):
-                frac = 0.093 if (met_val is not None and np.isfinite(met_val)) else 0.134
-                err1 = err2 = frac * r
-            elif r > 0.05 and teff_val > 0:
-                exp = _zams_exponent(teff_val, spectype.val)
-                coeff = exp * r / teff_val
-                if np.isfinite(teff.err1):
-                    err1 = coeff * teff.err1
-                if np.isfinite(teff.err2):
-                    err2 = coeff * teff.err2
-            else:
-                err1 = err2 = 0.0
             return ParamQty(
                 val=r,
                 mask=False,
@@ -291,8 +288,9 @@ def infer_star_mass(
 
     Calculates the mass from the stellar radius and surface gravity log(g):
     
-    $$ M = 10^{\log g - 4.43797 + 2 \log_{10} R} $$
+    $$ M = 10^{\log g - \log g_\odot + 2 \log_{10} R} $$
 
+    Passes thorugh unchanged if that is not possible
     Parameters
     ----------
     mass : ParamQty
@@ -311,16 +309,18 @@ def infer_star_mass(
         return mass
 
     if not logg.mask and not rad.mask:
-        m = 10 ** (logg.val - 4.43797 + 2 * np.log10(rad.val))
-        
+
+        # M_* = \frac{g}{g_\odot} R^2 = 10^{\log g - \log g_\odot + 2\log R}
+        m = 10 ** (logg.val - _LOG_G_SUN + 2 * np.log10(rad.val))
         # Error propagation
+        #\sigma_M = \sqrt{(M_* \ln 10 \cdot \sigma_{\log g})^2 + (2M_* \frac{\sigma_R}{R})^2}
         t_r_up = _safe_err_sq(rad.err1, rad.val, 2.0)
         t_r_dn = _safe_err_sq(rad.err2, rad.val, 2.0)
         t_g_up = _safe_err_sq(logg.err1, coeff=np.log(10.0))
         t_g_dn = _safe_err_sq(logg.err2, coeff=np.log(10.0))
         
-        err1 = m * np.sqrt(t_r_up + t_g_up) if (t_r_up > 0 or t_g_up > 0) else 0.0
-        err2 = m * np.sqrt(t_r_dn + t_g_dn) if (t_r_dn > 0 or t_g_dn > 0) else 0.0
+        err1 = m * np.sqrt(t_r_up + t_g_up)
+        err2 = m * np.sqrt(t_r_dn + t_g_dn)
         return ParamQty(
             val=m,
             mask=False,
