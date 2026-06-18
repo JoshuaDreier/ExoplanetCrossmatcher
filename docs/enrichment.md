@@ -175,7 +175,7 @@ the columns below added or replaced.  All `MaskedColumn` entries are masked
 | `pl_insol` | S⊕ | MaskedColumn | Insolation flux relative to Earth; direct `insol` from NEA if available, else L/a² |
 | `pl_insol_err1` | S⊕ | MaskedColumn | Upper 1σ (asymmetric propagation through L and a) |
 | `pl_insol_err2` | S⊕ | MaskedColumn | Lower 1σ |
-| `pl_insol_src` | — | str | Provenance (e.g. `'insol:nea'` or `'r:hpic teff:hpic a:emc'`) |
+| `pl_insol_src` | — | str | Provenance (e.g. `'nea'` for direct source values or `'derived(r:hpic teff:hpic a:provided)'`) |
 | `a_src` | — | str | Semi-major axis provenance (`'emc'`, or `'kepler(mass:nea p:emc)'`) |
 | `spectral_category` | — | str | Broad classification: `'Sun-like'`, `'Low-luminosity'`, `'Very-low-luminosity'`, `'Other'` |
 
@@ -303,7 +303,9 @@ Below is the list of all possible `src` strings for the derived quantities in th
 
 | Source String (`src`) | Derivation / Formula | Input Quantities | Meaning / Notes |
 | :--- | :--- | :--- | :--- |
-| `r:<rad_src> teff:<teff_src> a:<a_src>` | Insolation scaling:<br>$$S_{\text{eff}} = \frac{L}{a^2} = \frac{R^2 (T_{\text{eff}}/T_{\odot})^4}{a^2}$$ | $R$ (Stellar Radius)<br>$T_{\text{eff}}$ (Effective Temp)<br>$a$ (Semi-major axis in au) | Computes incoming flux relative to Earth's solar insolation. |
+| `<source_name>` | Direct source value | Source insolation column | Direct catalog value, e.g. `nea`, `epic`, `toi`, or `input`. |
+| `derived(r:<rad_src> teff:<teff_src> a:<a_src>)` | Insolation scaling:<br>$$S_{\text{eff}} = \frac{L}{a^2} = \frac{R^2 (T_{\text{eff}}/T_{\odot})^4}{a^2}$$ | $R$ (Stellar Radius)<br>$T_{\text{eff}}$ (Effective Temp)<br>$a$ (Semi-major axis in au) | Computes incoming flux relative to Earth's solar insolation when luminosity was derived from radius and temperature. |
+| `derived(lum:<lum_src> a:<a_src>)` | Insolation scaling:<br>$$S_{\text{eff}} = \frac{L}{a^2}$$ | $L$ (Stellar Luminosity)<br>$a$ (Semi-major axis in au) | Computes incoming flux relative to Earth's solar insolation when luminosity is direct or independently derived. |
 | `derived(eqt:<eqt_src>)` | Insolation-to-temperature inverse relation:<br>$$S_{\text{eff}} = \left(\frac{T_{\text{eq}}}{254.793}\right)^4$$ | $T_{\text{eq}}$ (Equilibrium Temp) | Reconstructed insolation value derived from equilibrium temperature under a Bond Albedo assumption $A_B = 0.3$. |
 
 ---

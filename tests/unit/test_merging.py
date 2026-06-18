@@ -33,12 +33,10 @@ def test_merge_values_priority():
     assert params_q['st_teff'][0].src == 'S2'
     assert params_q['st_teff'][0].err1 == 100
     
-    # Row 2 tests: rad might be derived from teff!
+    # Row 2 tests: _merge_values only source-merges; derivations happen in enrich().
     assert params_q['st_teff'][1].val == 6000
     assert params_q['st_teff'][1].src == 'S2'
-    # rad should be derived, not missing, because teff=6000 is enough for ms_radius_from_teff
-    assert not params_q['st_rad'][1].mask
-    assert 'ms(teff:S2)' in params_q['st_rad'][1].src or 'derived' in params_q['st_rad'][1].src
+    assert params_q['st_rad'][1].mask
 
 def test_merge_values_with_string_params():
     s1 = MockSource("S1", {1: {'spec': 'G2V'}})

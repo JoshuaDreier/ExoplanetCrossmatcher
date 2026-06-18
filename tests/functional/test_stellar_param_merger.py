@@ -13,7 +13,6 @@ from astropy import units as u
 from astropy.table import MaskedColumn, Table
 
 from crossmatching.enrichment import (
-    R_JUP_TO_EARTH,
     ParamFiller,
     _mann_teff_radius,
     mass_radius_chen_kipping,
@@ -158,7 +157,7 @@ def test_enrich_handles_missing_planet_columns():
     assert np.ma.is_masked(result["r_lower_bound"][0])
     assert np.ma.is_masked(result["r_upper_bound"][0])
     assert str(result["a_src"][0]) == ""
-    assert str(result["pl_insol_src"][0]) == "insol:nea"  # direct insol still binds
+    assert str(result["pl_insol_src"][0]) == "nea"  # direct insol still binds
 
 
 # ── Planet A: HPIC wins for stellar params; NEA fills mass / insol ─────────
@@ -199,7 +198,7 @@ def test_planet_a_mass_src_is_nea(enriched):
 def test_planet_a_pl_insol_src_is_insol_nea(enriched):
     # Planet A has pl_insol from NEA → pl_insol taken directly
     row = _row(enriched, "Planet A")
-    assert str(row["pl_insol_src"]) == "insol:nea"
+    assert str(row["pl_insol_src"]) == "nea"
 
 
 def test_planet_b_a_src_is_kepler(enriched):
@@ -223,7 +222,7 @@ def test_planet_c_pl_insol_src_empty(enriched):
 def test_planet_b_pl_insol_src_is_direct_insol(enriched):
     # Planet B has pl_insol from NEA → flux taken directly, not computed
     row = _row(enriched, "Planet B")
-    assert str(row["pl_insol_src"]) == "insol:nea"
+    assert str(row["pl_insol_src"]) == "nea"
 
 
 def test_computed_flux_src_lists_all_inputs():
@@ -305,7 +304,7 @@ def test_r_earth_conversion(enriched):
     from astropy import units as u
     factor = u.R_jup.to(u.R_earth)
     row = _row(enriched, "Planet A")
-    assert float(row["r"] * R_JUP_TO_EARTH) == pytest.approx(0.1 * factor)
+    assert float(row["r"] * u.R_jup.to(u.R_earth)) == pytest.approx(0.1 * factor)
 
 
 def test_spectral_category_non_null(enriched):
@@ -457,7 +456,7 @@ def test_planet_abc_r_lower_bound_masked(enriched):
 
 def test_rocky_mask_planet_a_confirmed(enriched):
     # Planet A: r=0.1 R_Jup ≈ 1.12 R_Earth → confirmed rocky
-    r = enriched["r"] * R_JUP_TO_EARTH
+    r = enriched["r"] * u.R_jup.to(u.R_earth)
     rmin = enriched["r_lower_bound"]
     rmax = enriched["r_upper_bound"]
     mask = rocky_mask(r, rmin, rmax, lower=0.5, upper=1.5)
@@ -467,7 +466,7 @@ def test_rocky_mask_planet_a_confirmed(enriched):
 
 def test_rocky_mask_planet_d_uncertain_rocky(enriched):
     # Planet D: no direct radius, but msini estimates put it in rocky range
-    r = enriched["r"] * R_JUP_TO_EARTH
+    r = enriched["r"] * u.R_jup.to(u.R_earth)
     rmin = enriched["r_lower_bound"]
     rmax = enriched["r_upper_bound"]
     idx = list(enriched["exo-mercat_name"]).index("Planet D")

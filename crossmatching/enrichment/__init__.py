@@ -1,4 +1,5 @@
 from crossmatching.enrichment.spectral_types import (
+    standardize_spectral_type,
     classify_spectral_type,
     teff_to_spectype,
     spectype_display,
@@ -18,7 +19,6 @@ from crossmatching.enrichment.masks import (
 )
 from crossmatching.enrichment.merger import (
     ParamFiller,
-    R_JUP_TO_EARTH,
 )
 
 from crossmatching.enrichment.param_sources import (
@@ -32,7 +32,7 @@ from crossmatching.enrichment.param_sources import (
 )
 
 __all__ = [
-    'standardize_spectral_type'
+    'standardize_spectral_type',
     'classify_spectral_type',
     'teff_to_spectype',
     'spectype_display',
@@ -46,5 +46,4 @@ __all__ = [
     'rocky_mask',
     'ParamFiller',
     'T_SUN',
-    'R_JUP_TO_EARTH',
 ]

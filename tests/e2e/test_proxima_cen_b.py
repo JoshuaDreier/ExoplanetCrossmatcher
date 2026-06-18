@@ -15,9 +15,10 @@ import numpy as np
 import pytest
 from tests.enrich_keys import DEFAULT_ENRICH_KEYS
 from astropy.table import Table
+import astropy.units as u
 
 from crossmatching import Crossmatcher, EMCCatalog, EMCIdSupplier, ParamFiller
-from crossmatching.enrichment import R_JUP_TO_EARTH, rocky_mask, temperate_mask
+from crossmatching.enrichment import rocky_mask, temperate_mask
 from crossmatching.enrichment.param_sources.hpic import HpicParamSource
 
 _EMC_FILE = "exo-mercat.csv"
@@ -115,7 +116,7 @@ def test_proxima_cen_b_is_temperate_uncertain_rocky(proxima_enriched):
         lower=_HZ_LOWER, upper=_HZ_UPPER,
     )[idx]
     is_uncertain_rocky = rocky_mask(
-        out["r"] * R_JUP_TO_EARTH, out["r_lower_bound"], out["r_upper_bound"],
+        out["r"] * u.R_jup.to(u.R_earth), out["r_lower_bound"], out["r_upper_bound"],
         lower=_ROCKY_LOWER, upper=_ROCKY_UPPER, use_interval=True,
     )[idx]
 

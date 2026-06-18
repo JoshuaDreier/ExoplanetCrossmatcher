@@ -207,7 +207,7 @@ def test_pl_insol_is_present_by_default():
     
     assert "pl_insol" in result.colnames
     assert float(result["pl_insol"][0]) == pytest.approx(1.1)
-    assert str(result["pl_insol_src"][0]) == "insol:nea"
+    assert str(result["pl_insol_src"][0]) == "nea"
     assert float(result["pl_insol_err1"][0]) == pytest.approx(0.1)
 
 
@@ -227,7 +227,7 @@ def test_planet_flux_key_overrides_pl_insol():
     assert "pl_insol" not in result.colnames
     
     assert float(result["my_flux"][0]) == pytest.approx(1.5)
-    assert str(result["my_flux_src"][0]) == "insol:input"
+    assert str(result["my_flux_src"][0]) == "input"
 
 
 def test_flux_rel_key_as_override_key_behaves_as_pl_insol_override():
@@ -246,7 +246,7 @@ def test_flux_rel_key_as_override_key_behaves_as_pl_insol_override():
     assert "pl_insol" not in result.colnames
     
     assert float(result["my_flux"][0]) == pytest.approx(1.5)
-    assert str(result["my_flux_src"][0]) == "insol:input"
+    assert str(result["my_flux_src"][0]) == "input"
 
 
 def test_star_effective_temperature_key_override():
