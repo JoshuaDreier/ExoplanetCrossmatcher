@@ -238,7 +238,9 @@ def test_flux_rel_key_as_override_key_behaves_as_pl_insol_override():
         "main_id":   [""],
         "my_flux":   MaskedColumn([1.5], mask=[False]),
     })
-    result = ParamFiller([nea]).enrich(cat, **{**DEFAULT_ENRICH_KEYS, "planet_flux_key": "my_flux"})
+    keys = {**DEFAULT_ENRICH_KEYS}
+    keys.pop("planet_flux_key")
+    result = ParamFiller([nea]).enrich(cat, **{**keys, "flux_rel_key": "my_flux"})
     
     assert "my_flux" in result.colnames
     assert "my_flux_src" in result.colnames
