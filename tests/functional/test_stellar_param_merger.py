@@ -204,13 +204,13 @@ def test_planet_a_pl_insol_src_is_insol_nea(enriched):
 def test_planet_b_a_src_is_kepler(enriched):
     # Planet B has a=0 in catalog, so Kepler fallback is used; mass from NEA
     row = _row(enriched, "Planet B")
-    assert str(row["a_src"]).startswith("kepler(mass:nea")
+    assert str(row["a_src"]).startswith("kepler_3rd(mass:nea")
 
 
 def test_planet_c_rad_src_is_ms_from_simbad(enriched):
     # Planet C: SIMBAD provides teff=3400K; mann_teff fallback applies (< 4000K, no K-band)
     row = _row(enriched, "Planet C")
-    assert str(row["st_rad_src"]) == "mann_teff(teff:simbad)"
+    assert str(row["st_rad_src"]) == "mann_teff(teff:simbad[no uncert.])"
 
 
 def test_planet_c_pl_insol_src_empty(enriched):
@@ -255,7 +255,7 @@ def test_computed_flux_src_lists_all_inputs():
     merger = ParamFiller([nea])
     result = merger.enrich(catalog, **{**DEFAULT_ENRICH_KEYS, **DEFAULT_ENRICH_KEYS})
     src = str(result["pl_insol_src"][0])
-    assert "r:" in src
+    assert "rad:" in src
     assert "teff:" in src
     assert "a:" in src
 

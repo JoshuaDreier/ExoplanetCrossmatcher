@@ -57,7 +57,6 @@ def test_disable_calculations_skips_derivations():
     
     # Assert disabled behavior
     assert "r_lower_bound" not in result_disabled.colnames
-    assert "a_src" not in result_disabled.colnames
     assert "spectral_category" not in result_disabled.colnames
     assert result_disabled["st_mass"].mask[0] # Mass was NOT derived, should be masked/empty
     assert "st_mass" in result_disabled.colnames # Column still exists because of _merge_values

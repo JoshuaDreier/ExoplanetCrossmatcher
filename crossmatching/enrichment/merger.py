@@ -15,7 +15,7 @@ from crossmatching.enrichment.inference import (
     infer_stellar_luminosity,
     infer_semi_major_axis,
     infer_msini_radius_bounds,
-    infer_planet_insolation,
+    infer_planet_flux,
     infer_planet_equilibrium_temperature,
     infer_spectral_type_display,
     ParamQty,
@@ -44,7 +44,15 @@ def _table_value_is_masked(table: Table, col: str, idx: int) -> bool:
     return bool(np.ma.getmaskarray(table[col])[idx])
 
 
-def _qty_from_table(table: Table, col: str, idx: int, *, src: str = "input") -> ParamQty:
+def _qty_from_table(
+        table: Table,
+        col: str,
+        idx: int,
+        *,
+        src: str = "input",
+        upper_error_suffix: str = "err1",
+        lower_error_suffix: str = "err2",
+    ) -> ParamQty:
     if col not in table.colnames:
         return ParamQty()
 
@@ -53,13 +61,25 @@ def _qty_from_table(table: Table, col: str, idx: int, *, src: str = "input") -> 
 
     q = ParamQty()
     q.val = _to_float(table[col][idx])
-    q.err1 = np.nan
-    q.err2 = np.nan
     q.src = src
     q.mask = not np.isfinite(q.val)
 
-    return q
+    err1_col = f"{col}_{upper_error_suffix}"
+    err2_col = f"{col}_{lower_error_suffix}"
 
+    q.err1 = (
+        _to_float(table[err1_col][idx])
+        if err1_col in table.colnames and not _table_value_is_masked(table, err1_col, idx)
+        else np.nan
+    )
+
+    q.err2 = (
+        _to_float(table[err2_col][idx])
+        if err2_col in table.colnames and not _table_value_is_masked(table, err2_col, idx)
+        else np.nan
+    )
+
+    return q
 
 def _str_from_table(table: Table, col: str, idx: int, *, src: str = "input") -> ParamStr:
     if col not in table.colnames:
@@ -74,48 +94,6 @@ def _str_from_table(table: Table, col: str, idx: int, *, src: str = "input") -> 
     s.mask = not bool(s.val.strip())
 
     return s
-
-def _put_qty_column(
-    result: Table,
-    col: str,
-    params: list[ParamQty],
-    *,
-    description: str = "",
-    upper_error_suffix: str = "err1",
-    lower_error_suffix: str = "err2",
-) -> None:
-    values = [p.val for p in params]
-    masks = [p.mask or not np.isfinite(p.val) for p in params]
-
-    result[col] = MaskedColumn(
-        values,
-        mask=masks,
-        name=col,
-        description=description,
-    )
-    result[f"{col}_src"] = [p.src for p in params]
-    result[f"{col}_{upper_error_suffix}"] = _mc(
-        [p.err1 for p in params],
-        f"{col}_{upper_error_suffix}",
-    )
-    result[f"{col}_{lower_error_suffix}"] = _mc(
-        [p.err2 for p in params],
-        f"{col}_{lower_error_suffix}",
-    )
-
-
-def _put_str_column(
-    result: Table,
-    col: str,
-    params: list[ParamStr],
-    *,
-    display_values: list[str] | None = None,
-) -> None:
-    values = display_values if display_values is not None else [p.val for p in params]
-    masks = [p.mask for p in params]
-
-    result[col] = MaskedColumn(values, mask=masks, name=col)
-    result[f"{col}_src"] = [p.src for p in params]
 
 
 class ParamFiller:
@@ -133,6 +111,7 @@ class ParamFiller:
         'sy_dist',
         'pl_insol',
         'pl_eqt',
+        'pl_a',
     ]
 
     PARAM_NAMES_STRINGS = [
@@ -151,6 +130,7 @@ class ParamFiller:
         'sy_vmag':     ('vmag', 'Visual band magnitude [mag]'),
         'sy_kmag':     ('kmag', '2MASS K-band magnitude [mag]'),
         'sy_dist':     ('distance', 'Distance [pc]'),
+        'pl_a':        ('semi_major_axis', 'Orbital semi-major axis [AU]'),
         'pl_insol':    ('planet_flux', 'Planet insolation flux [S_earth]'),
         'pl_eqt':      ('planet_equilibrium_temperature', 'Planet equilibrium temperature [K]'),
         'st_spectype': ('star_spectral_type', 'Stellar spectral type')
@@ -168,7 +148,8 @@ class ParamFiller:
         "sy_dist": "dist",
         "pl_insol": "insol",
         "pl_eqt": "pl_eqt",
-        "st_spectype": "spec",
+        "pl_a": "a",
+        "st_spectype": "spec",   
     }
 
     def __init__(self, sources: list[ParamSource], msini_sin_min: float = 0.3):
@@ -200,7 +181,7 @@ class ParamFiller:
             "planet_radius": "pl_rad",
             "planet_flux": "pl_insol",
             "planet_equilibrium_temperature": "pl_eqt",
-            "semi_major_axis": "semi_major_axis",
+            "semi_major_axis": "pl_a",
             "period": "period",
             "msini": "msini",
             "star_radius": "st_rad",
@@ -292,6 +273,8 @@ class ParamFiller:
         params_q: dict[str, list[ParamQty]],
         params_s: dict[str, list[ParamStr]],
         resolved_cols: dict[str, str],
+        upper_error_suffix: str,
+        lower_error_suffix: str,
     ) -> None:
         n = len(table)
 
@@ -301,7 +284,13 @@ class ParamFiller:
             if col_name not in table.colnames:
                 continue
             for i in range(n):
-                params_q[param_name][i] = _qty_from_table(table, col_name, i)
+                params_q[param_name][i] = _qty_from_table(
+                    table,
+                    col_name,
+                    i,
+                    upper_error_suffix=upper_error_suffix,
+                    lower_error_suffix=lower_error_suffix
+                )
 
         for param_name in self.PARAM_NAMES_STRINGS:
             canonical_name, _ = self.PARAM_METADATA[param_name]
@@ -352,13 +341,15 @@ class ParamFiller:
                     id_supplier=id_supplier,
                     alternate_ids=alternate_ids,
                 )
-                for param in self.PARAM_NAMES_QUANTITIES:
-                    source_key = self.SOURCE_KEY_ALIASES[param]
+                for param_name in self.PARAM_NAMES_QUANTITIES:
+                    source_key = self.SOURCE_KEY_ALIASES[param_name]
                     if source_key not in data: 
                         continue
-                    param = params_q[param][i]
+                    param = params_q[param_name][i]
                     val = _to_float(data[source_key])
-                    if not param.mask and np.isfinite(val):
+                    if not np.isfinite(param.val):
+                        continue
+                    if not param.mask and np.isfinite(param.val):
                         continue
                     param.val = val
                     param.mask = False
@@ -366,13 +357,16 @@ class ParamFiller:
                     param.err2 = _to_float(data.get(f"{source_key}_{lower_error_suffix}"))
                     param.src = source.source_name
 
-                for param in self.PARAM_NAMES_STRINGS:
-                    source_key = self.SOURCE_KEY_ALIASES[param]
+                for param_name in self.PARAM_NAMES_STRINGS:
+                    source_key = self.SOURCE_KEY_ALIASES[param_name]
                     if source_key not in data:
                         continue
-                    param = params_s[param][i]
-                    if not param.mask and not str(data[source_key] if data[source_key] is not None else ''):
+                    param = params_s[param_name][i]
+                    val = "" if data[source_key] is None else str(data[source_key])
+                    if not val.strip():
                         continue
+                    if not param.mask and str(param.val).strip():
+                        continue                    
                     param.val = data[source_key]
                     param.mask = False
                     param.src = source.source_name    
@@ -404,7 +398,7 @@ class ParamFiller:
         disable_calculations: bool = False,
         **override_keys,
     ) -> Table:
-        r"""Return a copy of table with enriched columns added or replaced.
+        """Return a copy of table with enriched columns added or replaced.
 
         Data priority is:
 
@@ -452,9 +446,12 @@ class ParamFiller:
         distance_key : str, optional
             Column name for distance.
         upper_error_suffix : str, optional
-            Suffix for upper uncertainty columns.
+            Suffix for upper uncertainty columns. 
+            The quantities read from the table will assume this column format and 
+            the newly written column will have that format
         lower_error_suffix : str, optional
             Suffix for lower uncertainty columns.
+            Dito
         input_starname_key : str, optional
             Column name used to identify host stars for lookups.
         id_supplier : IdSupplierBase, optional
@@ -470,8 +467,157 @@ class ParamFiller:
         Returns
         -------
         Table
-            Enriched result table.
+            Copy of the input table with enriched parameter columns added or replaced. 
+            Note that no non-masked/invalid (nan) values are ever overwritten. 
+
+            The following quantity columns are written using the resolved column
+            names from the corresponding ``*_key`` arguments, or the default
+            names shown below when no override is provided:
+
+            =============================== ===================== ==========================================
+            Physical parameter              Default column name   Processing
+            =============================== ===================== ==========================================
+            Stellar radius                  ``st_rad``            Input/source value, then inferred if needed.
+            Stellar mass                    ``st_mass``           Input/source value, then inferred if needed.
+            Stellar effective temperature   ``st_teff``           Input/source value, then inferred if needed.
+            Stellar luminosity              ``st_lum``            Input/source value, then inferred if needed.
+            Planet insolation flux          ``pl_insol``          Input/source value, then inferred if needed.
+            Planet equilibrium temperature  ``pl_eqt``            Input/source value, then inferred from ``pl_insol`` needed.
+            Semi-major axis                 ``pl_a``              Input/source value, then inferred from period and stellar mass if needed.
+            Stellar metallicity             ``st_met``            Input/source value only
+            Visual magnitude                ``sy_vmag``           Input/source value only
+            K-band magnitude                ``sy_kmag``           Input/source value only
+            Distance                        ``sy_dist``           Input/source value only
+            Stellar log surface gravity     ``st_logg``           Input/source value only
+            =============================== ===================== ==========================================
+
+            For calculation details, refer to the ``inference.py`` docstrings.
+
+            For each quantity column ``col``, the following columns are also
+            written:
+            - ``col``: merged or inferred value, masked when invalid or missing.
+            - ``col_src``: source label for the selected value.
+            - ``col_<upper_error_suffix>``: upper uncertainty, masked when
+              unavailable.
+            - ``col_<lower_error_suffix>``: lower uncertainty, masked when
+              unavailable.
+
+            By default, the uncertainty columns are named ``col_err1`` and
+            ``col_err2``.
+
+            The following string column is also written:
+
+            =============================== ===================== ==========================================
+            Logical parameter               Default column name   Processing
+            =============================== ===================== ==========================================
+            Stellar spectral type           ``st_spectype``       Input/source value; when calculations are
+                                                                  enabled, displayed using
+                                                                  ``infer_spectral_type_display``.
+            =============================== ===================== ==========================================
+
+            For the spectral-type column ``col``, the following columns are
+            written:
+            - ``col``: merged spectral type or display value.
+            - ``col_src``: source label for the selected spectral-type value.
+
+            When ``disable_calculations`` is False, the following additional
+            derived columns are added:
+
+            ====================== ==============================================================
+            Defualt Column Name                Processing
+            ====================== ================================================================
+            ``pl_rad_lower_bound`` Minimum estimated planet radius from ``msini`` and/or planet
+                                   radius, using ``infer_msini_radius_bounds``.
+            ``pl_rad_upper_bound`` Maximum estimated planet radius from ``msini`` and/or planet
+                                   radius, using ``infer_msini_radius_bounds``.
+            ``semi_major_axis_src``              Source label for the semi-major axis value selected or inferred
+                                   by ``infer_semi_major_axis``. The semi-major-axis value itself
+                                   is not written by this method.
+            ``spectral_category``  Spectral category computed from the displayed stellar spectral
+                                   type using ``classify_spectral_type``.
+            ====================== ==============================================================
+
+            Where ``pl_rad`` and ``semi_major_axis`` are named dependent on the 
+            correspnding keyword argument.
+
+                        Existing columns with the same resolved output names are replaced.
+            Values are selected in priority order: existing input table values
+            first, configured ``ParamSource`` values second, and inferred values
+            last. 
+            
+            If ``disable_calculations`` is True, only input/source merging
+            is performed; no ``infer_*`` functions are called and the additional
+            derived columns listed above are not added.
+
+        Source/provenance columns
+            -------------------------
+            Columns ending in ``_src`` record the provenance of the value in the
+            corresponding output column. For each enriched quantity column
+            ``col``, ``col_src`` describes where the selected value came from.
+            For the enriched spectral-type column, ``col_src`` records the
+            provenance of the underlying spectral-type value.
+
+            Source strings have the following forms:
+
+            ================================ ============================================================
+            Source string form                Meaning
+            ================================ ============================================================
+            ``input``                         The value was already present in the input table.
+            ``<source_name>``                 The value was filled from a configured ``ParamSource``.
+            ``StephanBoltzmann_derived(...)`` The value was derived using the Stefan-Boltzmann relation.
+            ``logg_derived(...)``             The value was derived from stellar surface gravity and
+                                              another stellar parameter.
+            ``spectype_derived(...)``         The value was estimated from stellar spectral type.
+            ``mann_mks(...)``                 Stellar radius was estimated using the Mann 2015 
+                                              (https://arxiv.org/abs/1501.01635) absolute K-band relation.
+            ``mann_teff(...)``                Stellar radius was estimated using the Mann 2015
+                                              (https://arxiv.org/abs/1501.01635) effective temperature relation.
+            ``torres(...)``                   Stellar radius was estimated using the Torres 2010 relation.
+            ``ms(...)``                       Stellar radius was estimated from a (zero-age) main-sequence/ZAMS
+                                              temperature-radius relation.
+            ``kepler_3rd(...)``               Semi-major axis was derived from orbital period and stellar
+                                              mass using Kepler's third law.
+            ``derived(...)``                  The value was derived from other available parameters.
+                                              For example planet insolation flux from stellar luminosity a semi major axis  
+            ``direct(...)``                   The value was computed directly from an available parameter,
+                                              for example radius bounds from ``msini``.
+            ================================ ============================================================
+
+            Derived-source strings include the sources of the input quantities
+            used in the calculation. For example, a luminosity derived from
+            radius and effective temperature may have a source string like::
+
+                StephanBoltzmann_derived(rad:input teff:nea)
+
+            This means the luminosity was derived with the Stefan-Boltzmann
+            relation using a stellar radius from the input table and an effective
+            temperature from the ``Nea`` (Nasa expoplanet archive) source.
+
+            If an input quantity used in a derivation has missing uncertainty
+            information, the source string is annotated with one of:
+
+            - ``[no uncert.]``: both upper and lower uncertainties are missing.
+            - ``[no err1]``: the upper uncertainty is missing.
+            - ``[no err2]``: the lower uncertainty is missing.
+
+            For example::
+
+                StephanBoltzmann_derived(rad:input[no uncert.] lum:NASA)
+
+            means the value was derived from radius and luminosity, but the
+            radius had no usable uncertainty information.
+
+            The following columns don't offer any source columns:
+            * ``r_lower_bound``, ``r_upper_bound``are always computed from ``msini``
+            * The ``spectral_category`` column is derived from the stellar spectral type column.
+
+            If ``disable_calculations`` is True, no derived-source strings are
+            produced because no ``infer_*`` functions are called. In that case,
+            ``_src`` columns only contain ``input`` or configured
+            ``ParamSource`` names.
+
         """
+        table = table.copy()
         n = len(table)
 
         resolved_cols = self._resolved_columns(
@@ -498,7 +644,7 @@ class ParamFiller:
         params_s = {key: [ParamStr() for _ in range(n)] for key in self.PARAM_NAMES_STRINGS}
 
         # 1. Input table values have highest priority.
-        self._preload_input_params(table, params_q, params_s, resolved_cols)
+        self._preload_input_params(table, params_q, params_s, resolved_cols, upper_error_suffix, lower_error_suffix)
 
         # 2. Source values fill only missing values.
         self._merge_values(
@@ -532,7 +678,6 @@ class ParamFiller:
         # 3. Fundamental stellar inferences.
         r_lower_bound = [ParamQty() for _ in range(n)]
         r_upper_bound = [ParamQty() for _ in range(n)]
-        semi_major_axis = [ParamQty() for _ in range(n)]
 
         displayed_spectypes: list[str] | None = None
         spectral_category: list[str] | None = None
@@ -556,18 +701,47 @@ class ParamFiller:
             )
 
             # 4. Planetary and orbital derived quantities.
-            semi_major_axis_col = resolved_cols["semi_major_axis"]
-            period_col = resolved_cols["period"]
+            planet_radius = _qty_from_table(
+                table,  
+                resolved_cols["planet_radius"], 
+                i, src="input", 
+                upper_error_suffix=upper_error_suffix,
+                lower_error_suffix=lower_error_suffix
+            )
+            msini = _qty_from_table(
+                table, 
+                resolved_cols["msini"], 
+                i, 
+                src="input",
+                upper_error_suffix=upper_error_suffix,
+                lower_error_suffix=lower_error_suffix
+            )
 
-            planet_radius = _qty_from_table(table,  resolved_cols["planet_radius"], i, src="input")
-            msini = _qty_from_table(table, resolved_cols["msini"], i, src="input")
+            r_lower_bound[i], r_upper_bound[i] = infer_msini_radius_bounds(
+                planet_radius,
+                msini,
+                self.msini_sin_min
+            )
 
-            r_lower_bound[i], r_upper_bound[i] = infer_msini_radius_bounds(planet_radius, msini, self.msini_sin_min)
-            provided_a = _qty_from_table(table, semi_major_axis_col, i, src="provided")
-            period = _qty_from_table(table, period_col, i, src="provided")
-            semi_major_axis[i] = infer_semi_major_axis(provided_a, period, params_q["st_mass"][i],period_src=period_col)
-            params_q["pl_insol"][i] = infer_planet_insolation(params_q["pl_insol"][i], params_q["st_lum"][i], semi_major_axis[i], params_q["pl_eqt"][i],)
+            period = _qty_from_table(
+                table,
+                resolved_cols["period"],
+                i,
+                src="input",
+                upper_error_suffix=upper_error_suffix,
+                lower_error_suffix=lower_error_suffix
+            )
 
+            params_q["pl_a"][i] = infer_semi_major_axis(
+                params_q["pl_a"][i],
+                period,
+                params_q["st_mass"][i],
+                period_src=resolved_cols["period"]
+            )
+             
+            params_q["pl_insol"][i] = infer_planet_flux(
+                *(params_q[k][i] for k in ["pl_insol", "st_lum", "pl_eqt", "pl_a"]),
+            )
             params_q["pl_eqt"][i] = infer_planet_equilibrium_temperature(params_q["pl_eqt"][i], params_q["pl_insol"][i], )
 
         # 5. Display spectral type and classify it.
@@ -582,8 +756,7 @@ class ParamFiller:
         self._populate_output_string_columns(result,params_s,resolved_cols,display_values={"st_spectype": displayed_spectypes,},)
         
         # 7. Insert extra derived columns.
-        result["r_lower_bound"] = _mc( [q.val for q in r_lower_bound],"r_lower_bound","Min estimated planet radius from msini [R_earth]")
-        result["r_upper_bound"] = _mc( [q.val for q in r_upper_bound],"r_upper_bound", "Max estimated planet radius from msini [R_earth]")
-        result["a_src"] = [a.src for a in semi_major_axis]
+        result[f"{resolved_cols["planet_radius"]}_lower_bound"] = _mc( [q.val for q in r_lower_bound],"r_lower_bound","Min estimated planet radius from msini [R_earth]")
+        result[f"{resolved_cols["planet_radius"]}_upper_bound"] = _mc( [q.val for q in r_upper_bound],"r_upper_bound", "Max estimated planet radius from msini [R_earth]")
         result["spectral_category"] = spectral_category
         return result
