@@ -16,7 +16,8 @@ be enriched with stellar and derived planetary parameters from multiple sources.
 | [Getting Started](getting-started.md) | Installation, caching data files, first crossmatch in 10 lines |
 | [Architecture](architecture.md) | Package layout, crossmatch data flow, enrichment pipeline diagram |
 | [Crossmatching](crossmatching.md) | ID matching, coordinate matching, combined strategy, output columns |
-| [Enrichment](enrichment.md) | `StellarParamMerger`, parameter-source priority chain, derived columns |
+| [Enrichment](enrichment.md) | `ParamFiller`, parameter-source priority chain, derived columns |
+| [Derived Parameter Inference](derived-parameter-inference.md) | Formulas, provenance strings, and citations for enrichment fallbacks |
 | [Catalogs](catalogs.md) | `NEACatalog`, `FileCatalog`, `EMCCatalog` — when to use each |
 | [ID Suppliers](id-suppliers.md) | `SimbadIdSupplier`, `EMCIdSupplier` — how alternate IDs are fetched |
 | [Configuration](configuration.md) | `crossmatching.cfg` keys and override patterns |

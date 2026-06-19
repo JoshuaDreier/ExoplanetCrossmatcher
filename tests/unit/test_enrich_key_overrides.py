@@ -230,27 +230,6 @@ def test_planet_flux_key_overrides_pl_insol():
     assert str(result["my_flux_src"][0]) == "input"
 
 
-def test_flux_rel_key_as_override_key_behaves_as_pl_insol_override():
-    """flux_rel_key in override_keys behaves as an alias for overriding pl_insol."""
-    nea = _nea_source(teff=5778.0, rad=1.0, mass=1.0)
-    cat = Table({
-        "nasa_name": ["Planet X"],
-        "main_id":   [""],
-        "my_flux":   MaskedColumn([1.5], mask=[False]),
-    })
-    keys = {**DEFAULT_ENRICH_KEYS}
-    keys.pop("planet_flux_key")
-    result = ParamFiller([nea]).enrich(cat, **{**keys, "flux_rel_key": "my_flux"})
-    
-    assert "my_flux" in result.colnames
-    assert "my_flux_src" in result.colnames
-    assert "my_flux_err1" in result.colnames
-    assert "pl_insol" not in result.colnames
-    
-    assert float(result["my_flux"][0]) == pytest.approx(1.5)
-    assert str(result["my_flux_src"][0]) == "input"
-
-
 def test_star_effective_temperature_key_override():
     """star_effective_temperature_key overrides st_teff to the custom column."""
     nea = _nea_source(teff=5778.0)

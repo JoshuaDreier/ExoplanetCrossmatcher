@@ -663,7 +663,8 @@ class ParamFiller:
         if disable_calculations:
             self._populate_output_quantity_columns(
                 result,
-                params_q,                resolved_cols,
+                params_q,                
+                resolved_cols,
                 upper_error_suffix,
                 lower_error_suffix,
             )
