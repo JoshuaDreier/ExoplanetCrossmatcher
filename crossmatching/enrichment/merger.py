@@ -756,7 +756,7 @@ class ParamFiller:
         self._populate_output_string_columns(result,params_s,resolved_cols,display_values={"st_spectype": displayed_spectypes,},)
         
         # 7. Insert extra derived columns.
-        result[f"{resolved_cols["planet_radius"]}_lower_bound"] = _mc( [q.val for q in r_lower_bound],"r_lower_bound","Min estimated planet radius from msini [R_earth]")
-        result[f"{resolved_cols["planet_radius"]}_upper_bound"] = _mc( [q.val for q in r_upper_bound],"r_upper_bound", "Max estimated planet radius from msini [R_earth]")
+        result[f"{resolved_cols["planet_radius"]}_lower_bound"] = _mc( [q.val for q in r_lower_bound],f"{resolved_cols["planet_radius"]}_lower_bound","Min estimated planet radius from msini [R_earth]")
+        result[f"{resolved_cols["planet_radius"]}_upper_bound"] = _mc( [q.val for q in r_upper_bound],f"{resolved_cols["planet_radius"]}_upper_bound", "Max estimated planet radius from msini [R_earth]")
         result["spectral_category"] = spectral_category
         return result
