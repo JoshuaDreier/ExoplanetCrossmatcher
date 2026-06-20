@@ -106,7 +106,7 @@ def test_proxima_cen_b_is_temperate_uncertain_rocky(proxima_enriched):
     idx = _proxima_b_idx(out)
 
     is_temperate = temperate_mask(
-        out["pl_insol"], out["pl_insolerr1"], out["pl_insolerr2"],
+        out["pl_insol"], out["pl_insol_max"], out["pl_insol_min"],
         lower=_HZ_LOWER, upper=_HZ_UPPER,
     )[idx]
     is_uncertain_rocky = rocky_mask(

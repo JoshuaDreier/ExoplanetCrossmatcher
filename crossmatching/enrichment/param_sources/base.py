@@ -51,6 +51,8 @@ def _build_nea_style_lookup(
         {"field": "msini","positive": True,  "has_error": True},
         {"field": "pl_mass", "positive": True,  "has_error": True},
         {"field": "pl_rad",  "positive": True,  "has_error": True},
+        {"field": "period",  "positive": True,  "has_error": True},
+        {"field": "pl_a",  "positive": True,  "has_error": True},
         {"field": "spec",    "positive": False, "has_error": False, "type": "str"},
     ]
 

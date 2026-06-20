@@ -114,7 +114,8 @@ class ParamFiller:
         'pl_a',
         'pl_rad',
         'pl_mass',
-        'msini'
+        'msini',
+        'period'
     ]
 
     PARAM_NAMES_STRINGS = [
@@ -134,6 +135,7 @@ class ParamFiller:
         'sy_kmag':     ('kmag', '2MASS K-band magnitude [mag]'),
         'sy_dist':     ('distance', 'Distance [pc]'),
         'pl_a':        ('semi_major_axis', 'Orbital semi-major axis [AU]'),
+        'period':      ('period', 'Orbital period [days]'),
         'pl_rad':      ('planet_radius', 'Planet radius [R_Jup]'),
         'pl_mass':     ('planet_mass', 'Planet masss [M_Jup]'),
         'msini':       ('msini', 'Planet minimum mass [M_Jup]'),
@@ -159,6 +161,7 @@ class ParamFiller:
         'pl_mass': 'pl_mass',
         'msini': 'msini',
         "st_spectype": "spec",   
+        "period": "period"
     }
 
     def __init__(self, sources: list[ParamSource], msini_sin_min: float = 0.3):
@@ -727,50 +730,14 @@ class ParamFiller:
             )
 
             # 4. Planetary and orbital derived quantities.
-            planet_radius = _qty_from_table(
-                table,  
-                resolved_cols["planet_radius"], 
-                i, src="input", 
-                upper_error_suffix=upper_error_suffix,
-                lower_error_suffix=lower_error_suffix
-            )
-            msini = _qty_from_table(
-                table, 
-                resolved_cols["msini"], 
-                i, 
-                src="input",
-                upper_error_suffix=upper_error_suffix,
-                lower_error_suffix=lower_error_suffix
-            )
-            mass = _qty_from_table(
-                table,
-                resolved_cols["planet_mass"],
-                i,
-                src="input",
-                upper_error_suffix=upper_error_suffix,
-                lower_error_suffix=lower_error_suffix
-            )
 
             r_lower_bound[i], r_upper_bound[i] = infer_msini_radius_bounds(
-                planet_radius,
-                msini,
-                mass,
+                *(params_q[k][i] for k in ["pl_rad", "msini", "pl_mass"]),
                 self.msini_sin_min
             )
 
-            period = _qty_from_table(
-                table,
-                resolved_cols["period"],
-                i,
-                src="input",
-                upper_error_suffix=upper_error_suffix,
-                lower_error_suffix=lower_error_suffix
-            )
-
             params_q["pl_a"][i] = infer_semi_major_axis(
-                params_q["pl_a"][i],
-                period,
-                params_q["st_mass"][i],
+                *(params_q[k][i] for k in ["pl_a","period","st_mass"]),
                 period_src=resolved_cols["period"]
             )
              

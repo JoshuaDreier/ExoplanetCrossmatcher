@@ -128,20 +128,25 @@ def _row(table, name):
 
 def test_all_enriched_columns_present(enriched: Table):
     for col in (
-        "st_teff", "st_rad", "st_mass", "sy_vmag", "sy_kmag", "sy_dist",
-        "st_logg", "st_met", "st_lum", "pl_eqt", "pl_mass",
-        "st_spectype", "st_spectype_src",
-        "r_lower_bound", "r_upper_bound", "pl_insol", "spectral_category",
-        "st_teff_src", "st_rad_src", "st_mass_src", "sy_vmag_src", "sy_kmag_src",
-        "sy_dist_src", "st_logg_src", "st_met_src", "st_lum_src", "pl_eqt_src",
-        "a_src", "pl_insol_src",
-        "st_tefferr1", "st_tefferr2", "st_raderr1", "st_raderr2",
-        "st_masserr1", "st_masserr2", "sy_vmagerr1", "sy_vmagerr2",
-        "sy_kmagerr1", "sy_kmagerr2",
-        "sy_disterr1", "sy_disterr2", "st_loggerr1", "st_loggerr2",
-        "st_meterr1",  "st_meterr2",  "st_lumerr1",  "st_lumerr2",
-        "pl_eqterr1",  "pl_eqterr2",  "pl_insolerr1", "pl_insolerr2",
-        "pl_masserr1", "pl_masserr2",
+        "exo-mercat_name", "nasa_name", "main_id", 
+        "p", "perr1", "perr2", "p_src",
+        "mass",  "masserr1", "masserr2", "mass_src", 
+        "st_rad", "st_rad_src", "st_raderr1", "st_raderr2", 
+        "st_mass", "st_mass_src", "st_masserr1", "st_masserr2", 
+        "st_teff", "st_teff_src", "st_tefferr1", "st_tefferr2", 
+        "st_logg", "st_logg_src", "st_loggerr1", "st_loggerr2", 
+        "st_met", "st_met_src", "st_meterr1", "st_meterr2", 
+        "st_lum", "st_lum_src", "st_lumerr1", "st_lumerr2", 
+        "sy_vmag", "sy_vmag_src", "sy_vmagerr1", "sy_vmagerr2", 
+        "sy_kmag", "sy_kmag_src", "sy_kmagerr1", "sy_kmagerr2", 
+        "sy_dist", "sy_dist_src", "sy_disterr1", "sy_disterr2",
+        "pl_insol", "pl_insol_src", "pl_insolerr1", "pl_insolerr2", 
+        "pl_eqt", "pl_eqt_src", "pl_eqterr1", "pl_eqterr2",
+        "a", "a_src", "aerr1", "aerr2", 
+        "r", "r_src", "rerr1", "rerr2", 
+        "msini", "msini_src", "msinierr1", "msinierr2", 
+        "r_lower_bound", "r_lower_bound_src", "r_upper_bound", "r_upper_bound_src", 
+        "st_spectype", "st_spectype_src", "spectral_category",
     ):
         assert col in enriched.colnames, f"missing column: {col}"
 
@@ -158,7 +163,7 @@ def test_enrich_handles_missing_planet_columns():
         "nasa_name":       ["Planet A"],
         "main_id":         [""],
     })
-    result = ParamFiller([nea]).enrich(catalog, **DEFAULT_ENRICH_KEYS)
+    result = ParamFiller([nea]).enrich(catalog, **EMCCa)
     assert np.ma.is_masked(result["r_lower_bound"][0])
     assert np.ma.is_masked(result["r_upper_bound"][0])
     assert str(result["a_src"][0]) == ""

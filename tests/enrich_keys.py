@@ -16,4 +16,6 @@ DEFAULT_ENRICH_KEYS = {
     'vmag_key': 'sy_vmag',
     'kmag_key': 'sy_kmag',
     'distance_key': 'sy_dist',
+    "upper_error_suffix": "err1",
+    "lower_error_suffix": "err2",
 }

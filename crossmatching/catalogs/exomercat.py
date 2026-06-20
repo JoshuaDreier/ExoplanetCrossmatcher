@@ -30,6 +30,8 @@ class EMCCatalog(CatalogBase):
         "semi_major_axis_key": "a",
         "period_key": "p",
         "msini_key": "msini",
+        "lower_error_suffix": "_min",
+        "upper_error_suffix": "_max",
     }
 
     def __init__(self, allowed_statuses: list[StatusValue] | None = None):
