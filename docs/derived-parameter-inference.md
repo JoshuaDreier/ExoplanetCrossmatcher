@@ -92,12 +92,21 @@ This is useful for consistent internal fallback behavior, not as a detailed clim
 
 ## Radius Bounds From `msini`
 
-`infer_msini_radius_bounds()` only produces bounds when direct planet radius is missing or invalid and `msini` is available. The output column names follow the resolved planet-radius key, for example `r_lower_bound` and `r_upper_bound` for Exo-MerCat.
+`infer_msini_radius_bounds()` only produces bounds when direct planet radius is missing or invalid and `pl_mass` or  `msini` is available. The output column names follow the resolved planet-radius key, for example `r_lower_bound` and `r_upper_bound` for Exo-MerCat.
 
-| Output | Formula | Inputs | Notes |
-| --- | --- | --- | --- |
-| `<planet_radius_key>_lower_bound` | $$R_{\mathrm{low}} = R_{\mathrm{CK17}}\left(M\sin i\right)$$ | `msini` | Converts Jupiter masses to Earth masses, then applies the Chen & Kipping 2017 mass-radius relation. |
-| `<planet_radius_key>_upper_bound` | $$R_{\mathrm{high}} = R_{\mathrm{CK17}}\left(\frac{M\sin i}{\sin i_{\min}}\right)$$ | `msini`, `msini_sin_min` | Uses `msini_sin_min=0.3` by default. |
+If `pl_mass` available (with errors `pl_masserr1` ${ \sigma^{+}_{M} }$,  `pl_masserr2` ${ \sigma^{-}_{M}}$), then 
+
+| Output                            | Formula                                                                    | Inputs                                                        | Notes                                                                                                                                               |
+| --------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<planet_radius_key>_lower_bound` | $$R_{\mathrm{low}} = R_{\mathrm{CK17}}(M-2 \sigma_{M}^{-})$$               | `pl_mass`,  `pl_masserr2`<br>(errors set to 0 if unavailable) | We "simulate" the Chen & Kipping relations large scatter by going two standard deviations away, giving us a rough ${ 2\sigma }$-confidence interval |
+| `<planet_radius_key>_upper_bound` | $$R_{\mathrm{high}} = R_{\mathrm{CK17}}\left(M + 2\sigma_{M} ^{+}\right)$$ | `pl_mass`, `pl_masserr1`<br>(errors set to 0 if unavailable)` |                                                                                                                                                     |
+
+If only `msini` available:
+
+| Output                            | Formula                                                                             | Inputs                   | Notes                                                                                               |
+| --------------------------------- | ----------------------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------- |
+| `<planet_radius_key>_lower_bound` | $$R_{\mathrm{low}} = R_{\mathrm{CK17}}\left(M\sin i\right)$$                        | `msini`                  | Converts Jupiter masses to Earth masses, then applies the Chen & Kipping 2017 mass-radius relation. |
+| `<planet_radius_key>_upper_bound` | $$R_{\mathrm{high}} = R_{\mathrm{CK17}}\left(\frac{M\sin i}{\sin i_{\min}}\right)$$ | `msini`, `msini_sin_min` | Uses `msini_sin_min=0.3` by default.                                                                |
 
 The implemented Chen-Kipping relation is:
 

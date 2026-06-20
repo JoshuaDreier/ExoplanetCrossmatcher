@@ -136,6 +136,7 @@ Important keys include:
 | Logical value           | Keyword                              | Default    | EMC       | NEA          |
 | ----------------------- | ------------------------------------ | ---------- | --------- | ------------ |
 | Planet radius           | `planet_radius_key`                  | `pl_rad`   | `r`       | `pl_radj`    |
+| Planet mass             | `planet_mass_key`                    | `pl_mass`  | `mass`    | `pl_massj`   |
 | Planet flux             | `planet_flux_key`                    | `pl_insol` | N/A       | `pl_insol`   |
 | Equilibrium temperature | `planet_equilibrium_temperature_key` | `pl_eqt`   | N/A       | `pl_eqt`     |
 | Semi-major axis         | `semi_major_axis_key`                | `pl_a`     | `a`       | `pl_orbsmax` |
@@ -143,6 +144,7 @@ Important keys include:
 | Minimum mass            | `msini_key`                          | `msini`    | `msini`   | `pl_msinij`  |
 | Stellar radius          | `star_radius_key`                    | `st_rad`   | `st_rad`  | `st_rad`     |
 | Stellar Teff            | `star_effective_temperature_key`     | `st_teff`  | `st_teff` | `st_teff`    |
+
 
 The resolved key controls the output name. For example, `planet_radius_key="r"` produces `r_lower_bound` and `r_upper_bound`; `semi_major_axis_key="a"` writes the enriched semi-major axis back to `a` plus `a_src`, `a_err1`, and `a_err2`.
 
@@ -155,24 +157,27 @@ For each enriched quantity column, `ParamFiller` writes:
 - `<column>_err1`: upper 1-sigma uncertainty, positive magnitude
 - `<column>_err2`: lower 1-sigma uncertainty, positive magnitude
 
-(`err1`, `err2` suffixes can be changed with keyword arguments)
+(`err1`, `err2` suffixes can be changed with keyword arguments, they are `_max` , `_min`  for Exo-MerCat)
 The standard quantity outputs are:
 
-| Default column | Meaning | Unit convention |
-| --- | --- | --- |
-| `st_rad` | Stellar radius | solar radii |
-| `st_mass` | Stellar mass | solar masses |
-| `st_teff` | Stellar effective temperature | K |
-| `st_logg` | Stellar surface gravity | log10(cm/s^2) |
-| `st_met` | Stellar metallicity | dex |
-| `st_lum` | Stellar luminosity | solar luminosities |
-| `sy_vmag` | V magnitude | mag |
-| `sy_kmag` | K magnitude | mag |
-| `sy_dist` | Distance | pc |
-| `pl_insol` | Planet insolation | Earth flux |
-| `pl_eqt` | Equilibrium temperature | K |
-| `pl_a` | Semi-major axis | AU |
-| `st_spectype` | Display spectral type | string |
+| Default column | Meaning                       | Unit convention    |
+| -------------- | ----------------------------- | ------------------ |
+| `st_rad`       | Stellar radius                | solar radii        |
+| `st_mass`      | Stellar mass                  | solar masses       |
+| `st_teff`      | Stellar effective temperature | K                  |
+| `st_logg`      | Stellar surface gravity       | log10(cm/s^2)      |
+| `st_met`       | Stellar metallicity           | dex                |
+| `st_lum`       | Stellar luminosity            | solar luminosities |
+| `sy_vmag`      | V magnitude                   | mag                |
+| `sy_kmag`      | K magnitude                   | mag                |
+| `sy_dist`      | Distance                      | pc                 |
+| `pl_insol`     | Planet insolation             | Earth flux         |
+| `pl_eqt`       | Equilibrium temperature       | K                  |
+| `pl_a`         | Semi-major axis               | AU                 |
+| `st_spectype`  | Display spectral type         | string             |
+| `period`       | Orbital Period                | days               |
+| `pl_rad`       | Planet radius                 | Jupiter radii      |
+| `pl_mass`      | Planet mass                   | Jupiter masses     |
 
 When calculations are enabled, two extra planet-radius bound columns are added using the resolved planet-radius key:
 - `<planet_radius_key>_lower_bound`

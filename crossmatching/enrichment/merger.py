@@ -439,6 +439,8 @@ class ParamFiller:
             Input catalog table.
         planet_radius_key : str, optional
             Column name for planet radius.
+        planet_mass_key : str, optional
+            Column name for true planet mass.
         planet_flux_key : str, optional
             Column name for planet insolation flux.
         planet_equilibrium_temperature_key : str, optional
@@ -508,6 +510,10 @@ class ParamFiller:
             Planet insolation flux          ``pl_insol``          Input/source value, then inferred if needed.
             Planet equilibrium temperature  ``pl_eqt``            Input/source value, then inferred from ``pl_insol`` needed.
             Semi-major axis                 ``pl_a``              Input/source value, then inferred from period and stellar mass if needed.
+            Planet radius                   ``pl_rad``            Input/source value only; suppresses radius bounds when present.
+            Planet mass                     ``pl_mass``           Input/source value only; preferred for radius bounds.
+            Minimum planet mass             ``msini``             Input/source value only; fallback for radius bounds.
+            Orbital period                  ``period``            Input/source value only; used for semi-major-axis inference.
             Stellar metallicity             ``st_met``            Input/source value only
             Visual magnitude                ``sy_vmag``           Input/source value only
             K-band magnitude                ``sy_kmag``           Input/source value only
@@ -550,13 +556,10 @@ class ParamFiller:
             ====================== ==============================================================
             Defualt Column Name                Processing
             ====================== ================================================================
-            ``pl_rad_lower_bound`` Minimum estimated planet radius from ``msini`` and/or planet
-                                   radius, using ``infer_msini_radius_bounds``.
-            ``pl_rad_upper_bound`` Maximum estimated planet radius from ``msini`` and/or planet
-                                   radius, using ``infer_msini_radius_bounds``.
-            ``semi_major_axis_src``              Source label for the semi-major axis value selected or inferred
-                                   by ``infer_semi_major_axis``. The semi-major-axis value itself
-                                   is not written by this method.
+            ``pl_rad_lower_bound`` Minimum estimated planet radius from true mass or ``msini``
+                                   when direct radius is missing.
+            ``pl_rad_upper_bound`` Maximum estimated planet radius from true mass or ``msini``
+                                   when direct radius is missing.
             ``spectral_category``  Spectral category computed from the displayed stellar spectral
                                    type using ``classify_spectral_type``.
             ====================== ==============================================================
@@ -599,12 +602,12 @@ class ParamFiller:
             ``torres(...)``                   Stellar radius was estimated using the Torres 2010 relation.
             ``ms(...)``                       Stellar radius was estimated from a (zero-age) main-sequence/ZAMS
                                               temperature-radius relation.
-            ``kepler_3rd(...)``               Semi-major axis was derived from orbital period and stellar
+            ``kepler(...)``                   Semi-major axis was derived from orbital period and stellar
                                               mass using Kepler's third law.
             ``derived(...)``                  The value was derived from other available parameters.
                                               For example planet insolation flux from stellar luminosity a semi major axis  
             ``direct(...)``                   The value was computed directly from an available parameter,
-                                              for example radius bounds from ``msini``.
+                                              for example radius bounds from planet mass or ``msini``.
             ================================ ============================================================
 
             Derived-source strings include the sources of the input quantities
@@ -632,7 +635,7 @@ class ParamFiller:
             radius had no usable uncertainty information.
 
             The following columns don't offer any source columns:
-            * ``r_lower_bound``, ``r_upper_bound``are always computed from ``msini``
+            * ``r_lower_bound``, ``r_upper_bound`` are computed from planet mass or ``msini``.
             * The ``spectral_category`` column is derived from the stellar spectral type column.
 
             If ``disable_calculations`` is True, no derived-source strings are
