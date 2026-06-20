@@ -5,6 +5,7 @@ Four planets exercise the full tier precedence and msini radius estimation:
   Planet B — NEA only
   Planet C — SIMBAD only; rad derived from Mann 2015 Teff polynomial (teff < 4000K)
   Planet D — msini only, no direct radius; tests uncertain-rocky estimation
+  Planet E - mass only (with errors), test (generous) radius bounds
 """
 import numpy as np
 import pytest
@@ -88,13 +89,16 @@ def _catalog_table():
     Planet D has no direct radius but has msini — exercises uncertain-rocky estimation.
     """
     return Table({
-        "exo-mercat_name": ["Planet A", "Planet B", "Planet C", "Planet D"],
-        "nasa_name":       ["Planet A", "Planet B", "unknown",  ""],
-        "main_id":         ["main_A",   "main_B",   "simbad_host_C", ""],
-        "r":               [0.1,        0.2,        0.08,       0.0],    # Jupiter radii; D absent
-        "a":               [1.0,        0.0,        0.0,        0.0485], # AU
-        "p":               [365.0,      30.0,       0.0,        11.186], # days
-        "msini":           [np.nan,     np.nan,     np.nan,     _MSINI_D],  # M_Jup; D only
+        "exo-mercat_name": ["Planet A", "Planet B", "Planet C", "Planet D", "Planet E"],
+        "nasa_name":       ["Planet A", "Planet B", "unknown",  "", ""],
+        "main_id":         ["main_A",   "main_B",   "simbad_host_C", "", ""],
+        "r":               [0.1,        0.2,        0.08,       0.0,        0],    # Jupiter radii; D absent
+        "a":               [1.0,        0.0,        0.0,        0.0485,     0], # AU
+        "p":               [365.0,      30.0,       0.0,        11.186,     0], # days
+        "msini":           [np.nan,     np.nan,     np.nan,     _MSINI_D,   np.nan],  # M_Jup; D only
+        "mass":            [np.nan,     np.nan,     np.nan,     np.nan,     1.0*u.M_earth.to(u.Mjup)],
+        "masserr1" :       [np.nan,     np.nan,     np.nan,     np.nan,     0.1*u.M_earth.to(u.Mjup)],
+        "masserr2":    [np.nan,     np.nan,     np.nan,     np.nan,     0.2*u.M_earth.to(u.Mjup)] 
     })
 
 
@@ -122,21 +126,22 @@ def _row(table, name):
 
 # ── expected columns present ──────────────────────────────────────────────────
 
-def test_all_enriched_columns_present(enriched):
+def test_all_enriched_columns_present(enriched: Table):
     for col in (
         "st_teff", "st_rad", "st_mass", "sy_vmag", "sy_kmag", "sy_dist",
-        "st_logg", "st_met", "st_lum", "pl_eqt",
+        "st_logg", "st_met", "st_lum", "pl_eqt", "pl_mass",
         "st_spectype", "st_spectype_src",
         "r_lower_bound", "r_upper_bound", "pl_insol", "spectral_category",
         "st_teff_src", "st_rad_src", "st_mass_src", "sy_vmag_src", "sy_kmag_src",
         "sy_dist_src", "st_logg_src", "st_met_src", "st_lum_src", "pl_eqt_src",
         "a_src", "pl_insol_src",
-        "st_teff_err1", "st_teff_err2", "st_rad_err1", "st_rad_err2",
-        "st_mass_err1", "st_mass_err2", "sy_vmag_err1", "sy_vmag_err2",
-        "sy_kmag_err1", "sy_kmag_err2",
-        "sy_dist_err1", "sy_dist_err2", "st_logg_err1", "st_logg_err2",
-        "st_met_err1",  "st_met_err2",  "st_lum_err1",  "st_lum_err2",
-        "pl_eqt_err1",  "pl_eqt_err2",  "pl_insol_err1", "pl_insol_err2",
+        "st_tefferr1", "st_tefferr2", "st_raderr1", "st_raderr2",
+        "st_masserr1", "st_masserr2", "sy_vmagerr1", "sy_vmagerr2",
+        "sy_kmagerr1", "sy_kmagerr2",
+        "sy_disterr1", "sy_disterr2", "st_loggerr1", "st_loggerr2",
+        "st_meterr1",  "st_meterr2",  "st_lumerr1",  "st_lumerr2",
+        "pl_eqterr1",  "pl_eqterr2",  "pl_insolerr1", "pl_insolerr2",
+        "pl_masserr1", "pl_masserr2",
     ):
         assert col in enriched.colnames, f"missing column: {col}"
 
@@ -153,7 +158,7 @@ def test_enrich_handles_missing_planet_columns():
         "nasa_name":       ["Planet A"],
         "main_id":         [""],
     })
-    result = ParamFiller([nea]).enrich(catalog, **{**DEFAULT_ENRICH_KEYS, **DEFAULT_ENRICH_KEYS})
+    result = ParamFiller([nea]).enrich(catalog, **DEFAULT_ENRICH_KEYS)
     assert np.ma.is_masked(result["r_lower_bound"][0])
     assert np.ma.is_masked(result["r_upper_bound"][0])
     assert str(result["a_src"][0]) == ""
@@ -162,22 +167,22 @@ def test_enrich_handles_missing_planet_columns():
 
 # ── Planet A: HPIC wins for stellar params; NEA fills mass / insol ─────────
 
-def test_planet_a_hpic_teff_wins(enriched):
+def test_planet_a_hpic_teff_wins(enriched: Table):
     row = _row(enriched, "Planet A")
     assert float(row["st_teff"]) == pytest.approx(5600.0)   # HPIC, not NEA 5200
 
 
-def test_planet_a_hpic_rad_wins(enriched):
+def test_planet_a_hpic_rad_wins(enriched: Table):
     row = _row(enriched, "Planet A")
     assert float(row["st_rad"]) == pytest.approx(0.95)
 
 
-def test_planet_a_nea_fills_mass(enriched):
+def test_planet_a_nea_fills_mass(enriched: Table):
     row = _row(enriched, "Planet A")
     assert float(row["st_mass"]) == pytest.approx(1.1)      # NEA (HPIC had no mass)
 
 
-def test_planet_a_pl_insol_unmasked(enriched):
+def test_planet_a_pl_insol_unmasked(enriched: Table):
     row = _row(enriched, "Planet A")
     assert not np.ma.is_masked(row["pl_insol"])
     assert float(row["pl_insol"]) > 0
@@ -185,41 +190,41 @@ def test_planet_a_pl_insol_unmasked(enriched):
 
 # ── Source provenance ────────────────────────────────────────────────────────
 
-def test_planet_a_teff_src_is_hpic(enriched):
+def test_planet_a_teff_src_is_hpic(enriched: Table):
     row = _row(enriched, "Planet A")
     assert str(row["st_teff_src"]) == "hpic"
 
 
-def test_planet_a_mass_src_is_nea(enriched):
+def test_planet_a_mass_src_is_nea(enriched: Table):
     row = _row(enriched, "Planet A")
     assert str(row["st_mass_src"]) == "nea"
 
 
-def test_planet_a_pl_insol_src_is_insol_nea(enriched):
+def test_planet_a_pl_insol_src_is_insol_nea(enriched: Table):
     # Planet A has pl_insol from NEA → pl_insol taken directly
     row = _row(enriched, "Planet A")
     assert str(row["pl_insol_src"]) == "nea"
 
 
-def test_planet_b_a_src_is_kepler(enriched):
+def test_planet_b_a_src_is_kepler(enriched: Table):
     # Planet B has a=0 in catalog, so Kepler fallback is used; mass from NEA
     row = _row(enriched, "Planet B")
     assert str(row["a_src"]).startswith("kepler(mass:nea")
 
 
-def test_planet_c_rad_src_is_ms_from_simbad(enriched):
+def test_planet_c_rad_src_is_ms_from_simbad(enriched: Table):
     # Planet C: SIMBAD provides teff=3400K; mann_teff fallback applies (< 4000K, no K-band)
     row = _row(enriched, "Planet C")
     assert str(row["st_rad_src"]) == "mann_teff(teff:simbad)"
 
 
-def test_planet_c_pl_insol_src_empty(enriched):
+def test_planet_c_pl_insol_src_empty(enriched: Table):
     # Planet C has no a, no insol → flux masked, src empty
     row = _row(enriched, "Planet C")
     assert str(row["pl_insol_src"]) == ""
 
 
-def test_planet_b_pl_insol_src_is_direct_insol(enriched):
+def test_planet_b_pl_insol_src_is_direct_insol(enriched: Table):
     # Planet B has pl_insol from NEA → flux taken directly, not computed
     row = _row(enriched, "Planet B")
     assert str(row["pl_insol_src"]) == "nea"
@@ -253,7 +258,7 @@ def test_computed_flux_src_lists_all_inputs():
         "p":               [365.0],
     })
     merger = ParamFiller([nea])
-    result = merger.enrich(catalog, **{**DEFAULT_ENRICH_KEYS, **DEFAULT_ENRICH_KEYS})
+    result = merger.enrich(catalog, **DEFAULT_ENRICH_KEYS)
     src = str(result["pl_insol_src"][0])
     assert "r:" in src
     assert "teff:" in src
@@ -262,12 +267,12 @@ def test_computed_flux_src_lists_all_inputs():
 
 # ── Planet B: NEA only ────────────────────────────────────────────────────────
 
-def test_planet_b_nea_teff(enriched):
+def test_planet_b_nea_teff(enriched: Table):
     row = _row(enriched, "Planet B")
     assert float(row["st_teff"]) == pytest.approx(4800.0)
 
 
-def test_planet_b_kepler_a_gives_unmasked_flux(enriched):
+def test_planet_b_kepler_a_gives_unmasked_flux(enriched: Table):
     # a=0 in catalog → Kepler fallback uses mass+period; pl_insol should be finite
     row = _row(enriched, "Planet B")
     assert not np.ma.is_masked(row["pl_insol"])
@@ -276,49 +281,49 @@ def test_planet_b_kepler_a_gives_unmasked_flux(enriched):
 
 # ── Planet C: SIMBAD only ─────────────────────────────────────────────────────
 
-def test_planet_c_simbad_teff(enriched):
+def test_planet_c_simbad_teff(enriched: Table):
     row = _row(enriched, "Planet C")
     assert float(row["st_teff"]) == pytest.approx(3400.0)
 
 
-def test_planet_c_rad_from_ms_radius(enriched):
+def test_planet_c_rad_from_ms_radius(enriched: Table):
     # mann_teff takes priority over ZAMS for teff < 4000K
     row = _row(enriched, "Planet C")
     assert float(row["st_rad"]) == pytest.approx(_mann_teff_radius(3400.0))
 
 
-def test_planet_c_pl_insol_masked(enriched):
+def test_planet_c_pl_insol_masked(enriched: Table):
     # No a, no period, no insol → pl_insol cannot be computed
     row = _row(enriched, "Planet C")
     assert np.ma.is_masked(row["pl_insol"])
 
 
-def test_planet_c_dist_from_parallax(enriched):
+def test_planet_c_dist_from_parallax(enriched: Table):
     row = _row(enriched, "Planet C")
     assert float(row["sy_dist"]) == pytest.approx(10.0)
 
 
 # ── derived columns ───────────────────────────────────────────────────────────
 
-def test_r_earth_conversion(enriched):
+def test_r_earth_conversion(enriched: Table):
     from astropy import units as u
     factor = u.R_jup.to(u.R_earth)
     row = _row(enriched, "Planet A")
     assert float(row["r"] * u.R_jup.to(u.R_earth)) == pytest.approx(0.1 * factor)
 
 
-def test_spectral_category_non_null(enriched):
+def test_spectral_category_non_null(enriched: Table):
     for row in enriched:
         assert str(row["spectral_category"]) != ""
 
 
-def test_planet_a_spectral_category(enriched):
+def test_planet_a_spectral_category(enriched: Table):
     # HPIC spec "G5V" → Sun-like
     row = _row(enriched, "Planet A")
     assert str(row["spectral_category"]) == "Sun-like"
 
 
-def test_planet_c_spectral_category(enriched):
+def test_planet_c_spectral_category(enriched: Table):
     # SIMBAD sp_type "M2V" → Low-luminosity
     row = _row(enriched, "Planet C")
     assert str(row["spectral_category"]) == "Low-luminosity"
@@ -326,100 +331,100 @@ def test_planet_c_spectral_category(enriched):
 
 # ── Uncertainty: errors bound to winning source, kept asymmetric ──────────────
 
-def test_planet_b_teff_err_asymmetric(enriched):
+def test_planet_b_teff_err_asymmetric(enriched: Table):
     # Planet B: NEA wins teff; err1=60, err2=50 (stored as positive magnitudes)
     row = _row(enriched, "Planet B")
-    assert not np.ma.is_masked(row["st_teff_err1"])
-    assert not np.ma.is_masked(row["st_teff_err2"])
-    assert float(row["st_teff_err1"]) == pytest.approx(60.0)
-    assert float(row["st_teff_err2"]) == pytest.approx(50.0)
+    assert not np.ma.is_masked(row["st_tefferr1"])
+    assert not np.ma.is_masked(row["st_tefferr2"])
+    assert float(row["st_tefferr1"]) == pytest.approx(60.0)
+    assert float(row["st_tefferr2"]) == pytest.approx(50.0)
 
 
-def test_planet_b_rad_err_asymmetric(enriched):
+def test_planet_b_rad_err_asymmetric(enriched: Table):
     # st_raderr1=0.03, st_raderr2=0.02 — separate positive magnitudes
     row = _row(enriched, "Planet B")
-    assert float(row["st_rad_err1"]) == pytest.approx(0.03)
-    assert float(row["st_rad_err2"]) == pytest.approx(0.02)
+    assert float(row["st_raderr1"]) == pytest.approx(0.03)
+    assert float(row["st_raderr2"]) == pytest.approx(0.02)
 
 
-def test_planet_a_teff_err_masked_because_hpic_has_no_errors(enriched):
+def test_planet_a_teff_err_masked_because_hpic_has_no_errors(enriched: Table):
     # Planet A: HPIC wins teff, HPIC has no error columns → both sides masked
     row = _row(enriched, "Planet A")
-    assert np.ma.is_masked(row["st_teff_err1"])
-    assert np.ma.is_masked(row["st_teff_err2"])
+    assert np.ma.is_masked(row["st_tefferr1"])
+    assert np.ma.is_masked(row["st_tefferr2"])
 
 
-def test_planet_a_mass_err_from_nea(enriched):
+def test_planet_a_mass_err_from_nea(enriched: Table):
     # Planet A: teff from HPIC (no err), but mass from NEA → mass_err from NEA
     # st_masserr1=0.05, st_masserr2=0.04
     row = _row(enriched, "Planet A")
-    assert float(row["st_mass_err1"]) == pytest.approx(0.05)
-    assert float(row["st_mass_err2"]) == pytest.approx(0.04)
+    assert float(row["st_masserr1"]) == pytest.approx(0.05)
+    assert float(row["st_masserr2"]) == pytest.approx(0.04)
 
 
-def test_planet_b_lum_err1_propagated(enriched):
+def test_planet_b_lumerr1_propagated(enriched: Table):
     # lum_err1 uses rad_err1 and teff_err1 (both push lum up)
     row = _row(enriched, "Planet B")
-    assert not np.ma.is_masked(row["st_lum_err1"])
+    assert not np.ma.is_masked(row["st_lumerr1"])
     teff   = float(row["st_teff"])
     rad    = float(row["st_rad"])
-    teff_e = float(row["st_teff_err1"])
-    rad_e  = float(row["st_rad_err1"])
+    teff_e = float(row["st_tefferr1"])
+    rad_e  = float(row["st_raderr1"])
     lum    = float(row["st_lum"])
     expected = lum * np.sqrt((2 * rad_e / rad) ** 2 + (4 * teff_e / teff) ** 2)
-    assert float(row["st_lum_err1"]) == pytest.approx(expected, rel=1e-5)
+    assert float(row["st_lumerr1"]) == pytest.approx(expected, rel=1e-5)
 
 
-def test_planet_b_lum_err2_propagated(enriched):
-    # lum_err2 uses rad_err2 and teff_err2 (both push lum down)
+def test_planet_b_lumerr2_propagated(enriched: Table):
+    # lumerr2 uses raderr2 and tefferr2 (both push lum down)
     row = _row(enriched, "Planet B")
-    assert not np.ma.is_masked(row["st_lum_err2"])
+    assert not np.ma.is_masked(row["st_lumerr2"])
     teff   = float(row["st_teff"])
     rad    = float(row["st_rad"])
-    teff_e = float(row["st_teff_err2"])
-    rad_e  = float(row["st_rad_err2"])
+    teff_e = float(row["st_tefferr2"])
+    rad_e  = float(row["st_raderr2"])
     lum    = float(row["st_lum"])
     expected = lum * np.sqrt((2 * rad_e / rad) ** 2 + (4 * teff_e / teff) ** 2)
-    assert float(row["st_lum_err2"]) == pytest.approx(expected, rel=1e-5)
+    assert float(row["st_lumerr2"]) == pytest.approx(expected, rel=1e-5)
 
 
-def test_planet_c_rad_err_from_mann_teff_scatter(enriched):
+def test_planet_c_rad_err_from_mann_teff_scatter(enriched: Table):
     # Planet C: rad from mann_teff, no metallicity → fixed 13.4% intrinsic scatter
     row = _row(enriched, "Planet C")
-    assert not np.ma.is_masked(row["st_rad_err1"])
-    assert not np.ma.is_masked(row["st_rad_err2"])
+    assert not np.ma.is_masked(row["st_raderr1"])
+    assert not np.ma.is_masked(row["st_raderr2"])
     expected = 0.134 * _mann_teff_radius(3400.0)
-    assert float(row["st_rad_err1"]) == pytest.approx(expected, rel=1e-5)
-    assert float(row["st_rad_err2"]) == pytest.approx(expected, rel=1e-5)
+    assert float(row["st_raderr1"]) == pytest.approx(expected, rel=1e-5)
+    assert float(row["st_raderr2"]) == pytest.approx(expected, rel=1e-5)
 
 
-def test_planet_b_pl_insol_err_is_direct_insol_err_asymmetric(enriched):
+def test_planet_b_pl_insol_err_is_direct_insol_err_asymmetric(enriched: Table):
     # Planet B has direct insol from NEA → pl_insol_err1=insol_err1, err2=insol_err2
     # _nea_table() row 1: pl_insolerr1=0.05 (upper), pl_insolerr2=-0.04 (lower → 0.04)
     row = _row(enriched, "Planet B")
-    assert not np.ma.is_masked(row["pl_insol_err1"])
-    assert not np.ma.is_masked(row["pl_insol_err2"])
-    assert float(row["pl_insol_err1"]) == pytest.approx(0.05)
-    assert float(row["pl_insol_err2"]) == pytest.approx(0.04)
+    assert not np.ma.is_masked(row["pl_insolerr1"])
+    assert not np.ma.is_masked(row["pl_insolerr2"])
+    assert float(row["pl_insolerr1"]) == pytest.approx(0.05)
+    assert float(row["pl_insolerr2"]) == pytest.approx(0.04)
 
 
 # ── temperate_mask integration ────────────────────────────────────────────────
 
-def test_temperate_mask_central_on_enriched(enriched):
+def test_temperate_mask_central_on_enriched(enriched: Table):
     # Planet A: pl_insol ≈ 1.2 (direct insol from NEA) → inside [0.25, 1.77]
-    mask = temperate_mask(enriched["pl_insol"], enriched["pl_insol_err1"],
-                          enriched["pl_insol_err2"], lower=0.25, upper=1.77)
+    mask = temperate_mask(enriched["pl_insol"], enriched["pl_insolerr1"],
+                          enriched["pl_insolerr2"], lower=0.25, upper=1.77)
     row_a = list(enriched["exo-mercat_name"]).index("Planet A")
     row_c = list(enriched["exo-mercat_name"]).index("Planet C")
     assert mask[row_a]       # Planet A has insol=1.2 → in range
     assert not mask[row_c]   # Planet C has masked flux → excluded
 
 
-def test_temperate_mask_interval_widens_selection(enriched):
+def test_temperate_mask_interval_widens_selection(enriched: Table):
     # Check that use_interval=True can include planets just outside the central range
     flux  = enriched["pl_insol"]
-    ferr1 = enriched["pl_insol_err1"]
-    ferr2 = enriched["pl_insol_err2"]
+    ferr1 = enriched["pl_insolerr1"]
+    ferr2 = enriched["pl_insolerr2"]
     tight = temperate_mask(flux, ferr1, ferr2, lower=0.25, upper=1.77, use_interval=False)
     wide  = temperate_mask(flux, ferr1, ferr2, lower=0.25, upper=1.77, use_interval=True)
     # Interval mode can only add planets, never remove them
@@ -428,14 +433,14 @@ def test_temperate_mask_interval_widens_selection(enriched):
 
 # ── Planet D: msini only, no direct radius ────────────────────────────────────
 
-def test_planet_d_no_direct_radius(enriched):
+def test_planet_d_no_direct_radius(enriched: Table):
     # Planet D has r=0 in catalog → treated as absent; bounds are populated instead
     row = _row(enriched, "Planet D")
     assert float(row["r"]) == 0.0
     assert not np.ma.is_masked(row["r_lower_bound"])
 
 
-def test_planet_d_r_lower_bound_rocky(enriched):
+def test_planet_d_r_lower_bound_rocky(enriched: Table):
     # msini=1.27 M_Earth → r_min = mass_radius_chen_kipping(1.27) in rocky range
     row = _row(enriched, "Planet D")
     assert not np.ma.is_masked(row["r_lower_bound"])
@@ -444,7 +449,7 @@ def test_planet_d_r_lower_bound_rocky(enriched):
     assert 0.5 < float(row["r_lower_bound"]) < 1.5
 
 
-def test_planet_abc_r_lower_bound_masked(enriched):
+def test_planet_abc_r_lower_bound_masked(enriched: Table):
     # Planets with direct radius have r_lower_bound/max masked
     for name in ("Planet A", "Planet B", "Planet C"):
         row = _row(enriched, name)
@@ -454,7 +459,7 @@ def test_planet_abc_r_lower_bound_masked(enriched):
 
 # ── rocky_mask integration ─────────────────────────────────────────────────────
 
-def test_rocky_mask_planet_a_confirmed(enriched):
+def test_rocky_mask_planet_a_confirmed(enriched: Table):
     # Planet A: r=0.1 R_Jup ≈ 1.12 R_Earth → confirmed rocky
     r = enriched["r"] * u.R_jup.to(u.R_earth)
     rmin = enriched["r_lower_bound"]
@@ -464,7 +469,7 @@ def test_rocky_mask_planet_a_confirmed(enriched):
     assert mask[idx]
 
 
-def test_rocky_mask_planet_d_uncertain_rocky(enriched):
+def test_rocky_mask_planet_d_uncertain_rocky(enriched: Table):
     # Planet D: no direct radius, but msini estimates put it in rocky range
     r = enriched["r"] * u.R_jup.to(u.R_earth)
     rmin = enriched["r_lower_bound"]
@@ -472,3 +477,9 @@ def test_rocky_mask_planet_d_uncertain_rocky(enriched):
     idx = list(enriched["exo-mercat_name"]).index("Planet D")
     assert not rocky_mask(r, rmin, rmax, lower=0.5, upper=1.5)[idx]              # strict
     assert rocky_mask(r, rmin, rmax, lower=0.5, upper=1.5, use_interval=True)[idx]  # uncertain
+
+
+def test_planet_e_radius_prediction_2sigma_uncertainty(enriched: Table):
+    row = _row(enriched, "Planet E")
+    assert row["r_lower_bound"] == pytest.approx(mass_radius_chen_kipping(0.6))
+    assert row["r_upper_bound"] == pytest.approx(mass_radius_chen_kipping(1.2))

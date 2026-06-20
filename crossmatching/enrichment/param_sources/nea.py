@@ -25,6 +25,8 @@ class NeaParamSource(ParamSource):
         'lum': 'st_lum',
         'met': 'st_met',
         'pl_eqt': 'pl_eqt',
+        "pl_mass": 'pl_massj',
+        'msini': 'pl_msinij',
         'spec': 'st_spectype',
     }
 
@@ -40,6 +42,8 @@ class NeaParamSource(ParamSource):
         'lum': ('st_lumerr1', 'st_lumerr2'),
         'met': ('st_meterr1', 'st_meterr2'),
         'pl_eqt': ('pl_eqterr1', 'pl_eqterr2'),
+        'pl_mass': ('pl_massjerr1', 'pl_massjerr2'),
+        'pl_msini': ('pl_msinijerr1', 'pl_msinijerr2'),
     }
 
     def download(self, key_list: list[str] = None) -> Table:

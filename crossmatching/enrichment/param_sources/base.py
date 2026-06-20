@@ -24,7 +24,7 @@ def _build_nea_style_lookup(
     This version uses a unified CONFIG list that describes how each field
     should be read (float vs. string), whether it must be positive, and whether
     it has an associated error column.  Special cases such as luminosity
-    conversion (log L → L) are handled explicitly after the generic loop.
+    conversion (log L to L) are handled explicitly after the generic loop.
     """
     # ---------------------------------------------------------------------
     # Unified configuration for all supported fields.
@@ -36,18 +36,22 @@ def _build_nea_style_lookup(
     #   * ``special`` – identifier for fields that need extra processing.
     # ---------------------------------------------------------------------
     CONFIG = [
-        {"field": "teff",   "positive": True,  "has_error": True},
-        {"field": "rad",    "positive": True,  "has_error": True},
-        {"field": "mass",   "positive": True,  "has_error": True},
-        {"field": "insol",  "positive": True,  "has_error": True},
-        {"field": "vmag",   "positive": False, "has_error": True},
-        {"field": "dist",   "positive": True,  "has_error": True},
-        {"field": "logg",   "positive": True,  "has_error": True},
-        {"field": "kmag",   "positive": False, "has_error": True},
-        {"field": "lum",    "positive": False, "has_error": True, "special": "lum"},
-        {"field": "met",    "positive": False, "has_error": True},
-        {"field": "pl_eqt", "positive": True,  "has_error": True, "special": "pl_eqt"},
-        {"field": "spec",   "positive": False, "has_error": False, "type": "str"},
+        {"field": "teff",    "positive": True,  "has_error": True},
+        {"field": "rad",     "positive": True,  "has_error": True},
+        {"field": "mass",    "positive": True,  "has_error": True},
+        {"field": "insol",   "positive": True,  "has_error": True},
+        {"field": "vmag",    "positive": False, "has_error": True},
+        {"field": "kmag",    "positive": False, "has_error": True},
+        {"field": "dist",    "positive": True,  "has_error": True},
+        {"field": "logg",    "positive": True,  "has_error": True},
+        {"field": "kmag",    "positive": False, "has_error": True},
+        {"field": "lum",     "positive": False, "has_error": True, "special": "lum"},
+        {"field": "met",     "positive": False, "has_error": True},
+        {"field": "pl_eqt",  "positive": True,  "has_error": True},
+        {"field": "msini","positive": True,  "has_error": True},
+        {"field": "pl_mass", "positive": True,  "has_error": True},
+        {"field": "pl_rad",  "positive": True,  "has_error": True},
+        {"field": "spec",    "positive": False, "has_error": False, "type": "str"},
     ]
 
     lookup: dict = {}
@@ -62,9 +66,7 @@ def _build_nea_style_lookup(
             col_name = columns.get(field)
             if not col_name or col_name not in cols:
                 continue
-            # -----------------------------------------------------------------
             # Normal (non‑special) handling
-            # -----------------------------------------------------------------
             if cfg.get("type") == "str":
                 value = _safe_str(row[col_name])
             else:
@@ -82,10 +84,8 @@ def _build_nea_style_lookup(
                         row[err_cols[1]] if err_cols[1] in cols else None,
                     )
                     if pair is not None:
-                        entry[f"{field}_err1"], entry[f"{field}_err2"] = pair
-            # -----------------------------------------------------------------
-            # Special cases – luminosity conversion and equilibrium temperature
-            # -----------------------------------------------------------------
+                        entry[f"{field}err1"], entry[f"{field}err2"] = pair
+            # Special cases – luminosity conversion
             if cfg.get("special") == "lum":
                 # ``value`` is the log‑luminosity; convert to linear units
                 log_lum = value
@@ -99,11 +99,8 @@ def _build_nea_style_lookup(
                         row[err_cols[1]] if err_cols[1] in cols else None,
                     )
                     if pair is not None:
-                        entry["lum_err1"] = 10.0 ** (log_lum + pair[0]) - lum
-                        entry["lum_err2"] = lum - 10.0 ** (log_lum - pair[1])
-            elif cfg.get("special") == "pl_eqt":
-                # ``value`` already respects ``positive`` flag; just store.
-                entry["pl_eqt"] = value
+                        entry["lumerr1"] = 10.0 ** (log_lum + pair[0]) - lum
+                        entry["lumerr2"] = lum - 10.0 ** (log_lum - pair[1])
         lookup[key] = entry
     return lookup
 

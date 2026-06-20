@@ -12,8 +12,8 @@ class MockSource:
         return self.data.get(row['id'], {})
 
 def test_merge_values_priority():
-    s1 = MockSource("S1", {1: {'rad': 1.5, 'rad_err1': 0.1}})
-    s2 = MockSource("S2", {1: {'rad': 2.0, 'teff': 5000, 'teff_err1': 100}, 2: {'teff': 6000}})
+    s1 = MockSource("S1", {1: {'rad': 1.5, 'raderr1': 0.1}})
+    s2 = MockSource("S2", {1: {'rad': 2.0, 'teff': 5000, 'tefferr1': 100}, 2: {'teff': 6000}})
     
     filler = ParamFiller([s1, s2])
     

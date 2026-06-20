@@ -86,8 +86,8 @@ def test_override_provenance_columns_use_custom_name():
     cat = _catalog("my_rad", 1.2)
     result = ParamFiller([nea]).enrich(cat, **{**DEFAULT_ENRICH_KEYS, "star_radius_key": "my_rad"})
     assert "my_rad_src"  in result.colnames
-    assert "my_rad_err1" in result.colnames
-    assert "my_rad_err2" in result.colnames
+    assert "my_raderr1" in result.colnames
+    assert "my_raderr2" in result.colnames
 
 
 # ---------------------------------------------------------------------------
@@ -203,12 +203,12 @@ def test_pl_insol_is_present_by_default():
         "main_id":   [""],
         "a":         [1.0],  # semi-major axis so computed flux is also defined if needed
     })
-    result = ParamFiller([nea]).enrich(cat, **{**DEFAULT_ENRICH_KEYS, **DEFAULT_ENRICH_KEYS})
+    result = ParamFiller([nea]).enrich(cat, **{**DEFAULT_ENRICH_KEYS})
     
     assert "pl_insol" in result.colnames
     assert float(result["pl_insol"][0]) == pytest.approx(1.1)
     assert str(result["pl_insol_src"][0]) == "nea"
-    assert float(result["pl_insol_err1"][0]) == pytest.approx(0.1)
+    assert float(result["pl_insolerr1"][0]) == pytest.approx(0.1)
 
 
 def test_planet_flux_key_overrides_pl_insol():
@@ -223,7 +223,7 @@ def test_planet_flux_key_overrides_pl_insol():
     
     assert "my_flux" in result.colnames
     assert "my_flux_src" in result.colnames
-    assert "my_flux_err1" in result.colnames
+    assert "my_fluxerr1" in result.colnames
     assert "pl_insol" not in result.colnames
     
     assert float(result["my_flux"][0]) == pytest.approx(1.5)
@@ -242,7 +242,7 @@ def test_star_effective_temperature_key_override():
     
     assert "my_teff" in result.colnames
     assert "my_teff_src" in result.colnames
-    assert "my_teff_err1" in result.colnames
+    assert "my_tefferr1" in result.colnames
     assert "st_teff" not in result.colnames
     
     assert float(result["my_teff"][0]) == pytest.approx(5800.0)

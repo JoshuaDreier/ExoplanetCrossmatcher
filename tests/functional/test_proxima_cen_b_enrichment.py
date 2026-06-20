@@ -26,7 +26,7 @@ from crossmatching.enrichment.param_sources.base import ParamSource
 
 _MSINI_PROXIMA_B = 1.27 / u.M_jup.to(u.M_earth)  # 1.27 M_Earth in M_Jup
 
-# HZ bounds used in this test (Kopparapu et al. 2013 conservative estimate)
+# HZ bounds used in this test 
 _HZ_LOWER = 0.35   # S_Earth (outer edge)
 _HZ_UPPER = 1.77   # S_Earth (inner edge)
 _ROCKY_LOWER = 0.5  # R_Earth
@@ -68,7 +68,7 @@ def proxima_enriched():
     })
 
     merger = ParamFiller([src])
-    return merger.enrich(table, **{**DEFAULT_ENRICH_KEYS, **DEFAULT_ENRICH_KEYS})
+    return merger.enrich(table, **DEFAULT_ENRICH_KEYS)
 
 
 # ── radius from msini ─────────────────────────────────────────────────────────
@@ -121,14 +121,14 @@ def test_rocky_mask_use_interval(proxima_enriched):
 
 def test_temperate_mask(proxima_enriched):
     out = proxima_enriched
-    assert temperate_mask(out["pl_insol"], out["pl_insol_err1"], out["pl_insol_err2"],
+    assert temperate_mask(out["pl_insol"], out["pl_insolerr1"], out["pl_insolerr1"],
                           lower=_HZ_LOWER, upper=_HZ_UPPER)[0]
 
 
 def test_proxima_cen_b_temperate_uncertain_rocky(proxima_enriched):
     out = proxima_enriched
     is_temperate = temperate_mask(
-        out["pl_insol"], out["pl_insol_err1"], out["pl_insol_err2"],
+        out["pl_insol"], out["pl_insolerr1"], out["pl_insolerr1"],
         lower=_HZ_LOWER, upper=_HZ_UPPER,
     )[0]
     is_uncertain_rocky = rocky_mask(

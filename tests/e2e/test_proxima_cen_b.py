@@ -13,7 +13,6 @@ import os
 
 import numpy as np
 import pytest
-from tests.enrich_keys import DEFAULT_ENRICH_KEYS
 from astropy.table import Table
 import astropy.units as u
 
@@ -21,16 +20,11 @@ from crossmatching import Crossmatcher, EMCCatalog, EMCIdSupplier, ParamFiller
 from crossmatching.enrichment import rocky_mask, temperate_mask
 from crossmatching.enrichment.param_sources.hpic import HpicParamSource
 
-_EMC_FILE = "exo-mercat.csv"
+_EMC_FILE   = "tests/data/exo-mercat2026-06-08.csv"
 _HZ_LOWER  = 0.35   # S_Earth outer edge
 _HZ_UPPER  = 1.77   # S_Earth inner edge
 _ROCKY_LOWER = 0.5  # R_Earth
 _ROCKY_UPPER = 1.5  # R_Earth
-
-pytestmark = pytest.mark.skipif(
-    not os.path.exists(_EMC_FILE),
-    reason=f"{_EMC_FILE} not present — run from project root with cached catalog",
-)
 
 
 def _proxima_b_idx(table):
@@ -69,7 +63,7 @@ def proxima_enriched():
     # ── enrich ──────────────────────────────────────────────────────────────
     hpic_src = HpicParamSource(result)
     hpic_src.load()
-    return ParamFiller([hpic_src]).enrich(result, **{**DEFAULT_ENRICH_KEYS, **DEFAULT_ENRICH_KEYS})
+    return ParamFiller([hpic_src]).enrich(result, **EMCCatalog.ENRICH_KEYS)
 
 
 # ── crossmatch found the planet ──────────────────────────────────────────────
@@ -112,7 +106,7 @@ def test_proxima_cen_b_is_temperate_uncertain_rocky(proxima_enriched):
     idx = _proxima_b_idx(out)
 
     is_temperate = temperate_mask(
-        out["pl_insol"], out["pl_insol_err1"], out["pl_insol_err2"],
+        out["pl_insol"], out["pl_insolerr1"], out["pl_insolerr2"],
         lower=_HZ_LOWER, upper=_HZ_UPPER,
     )[idx]
     is_uncertain_rocky = rocky_mask(

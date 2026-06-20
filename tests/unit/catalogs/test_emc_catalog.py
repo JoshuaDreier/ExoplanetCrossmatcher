@@ -5,7 +5,7 @@ from astropy.table import Table, Column
 from crossmatching import Crossmatcher, EMCCatalog, SimbadIdSupplier
 
 
-_EMC_FILE = "exo-mercat.csv"
+_EMC_FILE   = "tests/data/exo-mercat2026-06-08.csv"
 _REQUIRED_COLUMNS = ("host", "main_id_ra", "main_id_dec", "exo-mercat_name", "main_id_aliases")
 
 

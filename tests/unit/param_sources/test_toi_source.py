@@ -3,6 +3,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 from astropy.table import Table
+import astropy.units as u
 
 from crossmatching.enrichment.param_sources.toi import ToiParamSource
 
@@ -29,6 +30,9 @@ def _toi_table(*rows):
         "pl_eqt":      [r.get("pl_eqt",    0.0)      for r in rows],
         "pl_eqterr1":  [r.get("pl_eqterr1", np.nan)  for r in rows],
         "pl_eqterr2":  [r.get("pl_eqterr2", np.nan)  for r in rows],
+        "pl_rade":     [r.get("pl_rade", 0.0)        for r in rows],
+        "pl_radeerr1": [r.get("pl_radeerr1", np.nan)  for r in rows],
+        "pl_radeerr2": [r.get("pl_radeerr2", np.nan)  for r in rows],
     })
 
 
@@ -44,7 +48,7 @@ def _emc_row(toi_name):
 def test_returns_available_params():
     src = ToiParamSource()
     _loaded(src, _toi_table({"toidisplay": "TOI-700.01", "st_teff": 3480.0, "st_rad": 0.42,
-                              "st_dist": 31.1, "st_logg": 4.7, "pl_insol": 0.9, "pl_eqt": 268.0}))
+                              "st_dist": 31.1, "st_logg": 4.7, "pl_insol": 0.9, "pl_eqt": 268.0, "pl_rade": 1.0}))
     result = src.get(_emc_row("TOI-700.01"))
     assert result["teff"]   == pytest.approx(3480.0)
     assert result["rad"]    == pytest.approx(0.42)
@@ -52,6 +56,7 @@ def test_returns_available_params():
     assert result["logg"]   == pytest.approx(4.7)
     assert result["insol"]  == pytest.approx(0.9)
     assert result["pl_eqt"] == pytest.approx(268.0)
+    assert result["pl_rad"] == pytest.approx(u.Rearth.to(u.Rjup)) # check for correct conversion to Jupiter radii units
 
 
 def test_dist_comes_from_st_dist_not_sy_dist():
@@ -107,8 +112,8 @@ def test_teff_err_asymmetric():
     _loaded(src, _toi_table({"toidisplay": "TOI-500.01", "st_teff": 4800.0,
                               "st_tefferr1": 120.0, "st_tefferr2": -90.0}))
     result = src.get(_emc_row("TOI-500.01"))
-    assert result["teff_err1"] == pytest.approx(120.0)
-    assert result["teff_err2"] == pytest.approx(90.0)
+    assert result["tefferr1"] == pytest.approx(120.0)
+    assert result["tefferr2"] == pytest.approx(90.0)
 
 
 def test_dist_err_uses_st_disterr_columns():
@@ -117,13 +122,13 @@ def test_dist_err_uses_st_disterr_columns():
     _loaded(src, _toi_table({"toidisplay": "TOI-600.01", "st_teff": 5000.0,
                               "st_dist": 50.0, "st_disterr1": 2.0, "st_disterr2": -1.5}))
     result = src.get(_emc_row("TOI-600.01"))
-    assert result["dist_err1"] == pytest.approx(2.0)
-    assert result["dist_err2"] == pytest.approx(1.5)
+    assert result["disterr1"] == pytest.approx(2.0)
+    assert result["disterr2"] == pytest.approx(1.5)
 
 
 def test_no_err_when_absent():
     src = ToiParamSource()
     _loaded(src, _toi_table({"toidisplay": "TOI-700.02", "st_teff": 3480.0}))
     result = src.get(_emc_row("TOI-700.02"))
-    assert "teff_err1" not in result
-    assert "teff_err2" not in result
+    assert "tefferr1" not in result
+    assert "tefferr2" not in result

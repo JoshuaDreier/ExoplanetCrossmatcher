@@ -33,6 +33,11 @@ class ParamStr:
     src: str = ""
 
 
+def _is_valid_qty(q: ParamQty) -> bool:
+    """Return True if a ParamQty contains a usable finite value."""
+    return not q.mask and np.isfinite(q.val)
+
+
 def _safe_err_sq(err: float, val: float = 1.0, coeff: float = 1.0) -> float:
     """Safely compute the squared error term (coeff * err / val)^2.
 
@@ -334,45 +339,6 @@ def infer_star_mass(
     return mass
 
 
-_M_JUP_TO_EARTH = u.M_jup.to(u.M_earth)
-
-def _is_valid_qty(q: ParamQty) -> bool:
-    """Return True if a ParamQty contains a usable finite value."""
-    return not q.mask and np.isfinite(q.val)
-
-
-def _copy_qty(q: ParamQty) -> ParamQty:
-    """Return a shallow value-copy of a ParamQty."""
-    return ParamQty(
-        val=q.val,
-        mask=q.mask,
-        src=q.src,
-        err1=q.err1,
-        err2=q.err2,
-    )
-
-
-def _copy_str(s: ParamStr) -> ParamStr:
-    """Return a shallow value-copy of a ParamStr."""
-    return ParamStr(
-        val=s.val,
-        mask=s.mask,
-        src=s.src,
-    )
-
-
-def _masked_qty(src: str = "") -> ParamQty:
-    """Return a masked ParamQty with NaN value and uncertainties."""
-    return ParamQty(
-        val=np.nan,
-        mask=True,
-        src=src,
-        err1=np.nan,
-        err2=np.nan,
-    )
-
-
-
 def infer_stellar_luminosity(
     lum: ParamQty,
     rad: ParamQty,
@@ -403,10 +369,10 @@ def infer_stellar_luminosity(
         luminosity.
     """
     if _is_valid_qty(lum):
-        return _copy_qty(lum)
+        return lum
 
     if not _is_valid_qty(rad) or not _is_valid_qty(teff):
-        return _copy_qty(lum)
+        return lum
 
     l_val = rad.val**2 * (teff.val / T_SUN) ** 4
 
@@ -429,18 +395,33 @@ def infer_stellar_luminosity(
         err2=err2,
     )
 
-
 def infer_msini_radius_bounds(
     planet_radius: ParamQty,
     msini: ParamQty,
-    msini_sin_min: float,
+    mass: ParamQty,
+    msini_sin_min: float = 0.3,
 ) -> tuple[ParamQty, ParamQty]:
-    r"""Derive lower and upper radius bounds from minimum planet mass.
+    r"""Derive lower and upper radius bounds from planet mass or minimum mass.
 
-    If the planet radius is already provided, no bounds are inferred. Otherwise,
-    this function converts the minimum mass from Jupiter masses to Earth masses
-    and applies the Chen-Kipping mass-radius relation.
+    If the planet radius is already provided, no bounds are inferred.
 
+    If a true mass measurement is available (with finite ``err1``/``err2``),
+    it takes priority over ``msini``. The radius bounds are derived by
+    propagating the mass to its 2-sigma envelope,
+
+    $$ M - 2\,\sigma_{M,\text{lower}} \quad\text{and}\quad M + 2\,\sigma_{M,\text{upper}} $$
+
+    where $\sigma_{M,\text{lower}}$ and $\sigma_{M,\text{upper}}$ come from
+    ``mass.err2`` and ``mass.err1`` respectively, then passing each endpoint
+    through the Chen-Kipping relation. Note this only propagates measurement
+    uncertainty on the mass — it does not add the relation's intrinsic
+    dispersion $\sigma_{\mathcal{R}}$ in quadrature, since
+    ``mass_radius_chen_kipping`` is a deterministic point estimate that
+    doesn't expose that term. Treat these as conservative/approximate
+    2-sigma bounds, not a full posterior predictive interval.
+
+    Otherwise, this function falls back to the minimum mass ($M_p \sin i$),
+    converting Jupiter masses to Earth masses and applying the same relation.
     The lower bound uses
 
     $$ M_p \sin i $$
@@ -456,25 +437,61 @@ def infer_msini_radius_bounds(
     planet_radius : ParamQty
         Planet radius data. If valid and positive, no bounds are produced.
     msini : ParamQty
-        Minimum planet mass in Jupiter masses.
+        Minimum planet mass in Jupiter masses. Used only if ``mass`` is not
+        usable.
+    mass : ParamQty
+        True planet mass in Jupiter masses, with upper (``err1``) and lower
+        (``err2``) 1-sigma uncertainties. Takes priority over ``msini`` when
+        valid and both errors are finite.
     msini_sin_min : float
-        Minimum allowed value of sin inclination used for the upper bound.
+        Minimum allowed value of sin inclination used for the msini-based
+        upper bound.
 
     Returns
     -------
     tuple[ParamQty, ParamQty]
         Lower and upper radius-bound estimates in Earth radii.
+        By defualt we approximate the 2σ confidence interval
     """
-    lower = _masked_qty()
-    upper = _masked_qty()
+    lower = ParamQty()
+    upper = ParamQty()
 
     radius_valid = _is_valid_qty(planet_radius) and planet_radius.val > 0
-    msini_valid = _is_valid_qty(msini) and msini.val > 0
-
-    if radius_valid or not msini_valid:
+    if radius_valid:
         return lower, upper
 
-    msini_earth = msini.val * _M_JUP_TO_EARTH
+    if _is_valid_qty(mass):
+        mass_earth = mass.val * u.M_jup.to(u.M_earth)
+        err_upper_earth = mass.err1 * u.M_jup.to(u.M_earth)
+        err_lower_earth = mass.err2 * u.M_jup.to(u.M_earth)
+
+        mass_lower_earth = mass_earth - 2.0 * (err_lower_earth if err_lower_earth else 0)
+        mass_upper_earth = mass_earth + 2.0 * (err_upper_earth if err_upper_earth else 0)
+
+        lower_val = mass_radius_chen_kipping(mass_lower_earth)
+        upper_val = mass_radius_chen_kipping(mass_upper_earth)
+
+        lower = ParamQty(
+            val=lower_val,
+            mask=False,
+            src=f"derived(mass:{mass.src} -2sigma)",
+            err1=np.nan,
+            err2=np.nan,
+        )
+        upper = ParamQty(
+            val=upper_val,
+            mask=False,
+            src=f"derived(mass:{mass.src} +2sigma)",
+            err1=np.nan,
+            err2=np.nan,
+        )
+        return lower, upper
+
+    msini_valid = _is_valid_qty(msini) and msini.val > 0
+    if not msini_valid:
+        return lower, upper
+
+    msini_earth = msini.val * u.M_jup.to(u.M_earth)
 
     lower_val = mass_radius_chen_kipping(msini_earth)
     upper_val = mass_radius_chen_kipping(msini_earth / msini_sin_min)
@@ -531,13 +548,13 @@ def infer_semi_major_axis(
         Semi-major axis data in AU.
     """
     if _is_valid_qty(semi_major_axis) and semi_major_axis.val > 0:
-        return _copy_qty(semi_major_axis)
+        return semi_major_axis
 
     if not (_is_valid_qty(period) and period.val > 0):
-        return _copy_qty(semi_major_axis)
+        return semi_major_axis
 
     if not (_is_valid_qty(mass) and mass.val > 0):
-        return _copy_qty(semi_major_axis)
+        return semi_major_axis
 
     a_val = (mass.val * (period.val / 365.25) ** 2) ** (1.0 / 3.0)
 
@@ -597,7 +614,7 @@ def infer_planet_insolation(
         Planet insolation flux in Earth flux units.
     """
     if _is_valid_qty(insol):
-        return _copy_qty(insol)
+        return insol
 
     if (
         _is_valid_qty(lum)
@@ -653,7 +670,7 @@ def infer_planet_insolation(
             err2=err2,
         )
 
-    return _copy_qty(insol)
+    return insol
 
 
 def infer_planet_equilibrium_temperature(
@@ -681,10 +698,10 @@ def infer_planet_equilibrium_temperature(
         Planet equilibrium temperature in Kelvin.
     """
     if _is_valid_qty(eqt):
-        return _copy_qty(eqt)
+        return eqt
 
     if not (_is_valid_qty(insol) and insol.val > 0):
-        return _copy_qty(eqt)
+        return eqt
 
     t_val = 254.793 * insol.val**0.25
 

@@ -6,7 +6,7 @@ from crossmatching.enrichment.param_sources.base import ParamSource, _build_nea_
 
 class EuParamSource(ParamSource):
     # Column name in the local catalog used as the lookup key
-    key_col = "name"
+    key_col = "eu_name"
     source_name = "eu"
 
     # Mapping from the generic field names used by the merge chain to the
@@ -20,13 +20,21 @@ class EuParamSource(ParamSource):
         "mass": "star_mass",
         "dist": "star_distance",
         "met": "star_metallicity",
+        "vmag": "mag_v",
+        "kmag": "mag_k",
         "pl_eqt": "temp_calculated",
+        "pl_rad": "radius",
+        "pl_mass": "mass",
+        "msini": "mass_sin_i",
         "spec": "star_spec_type",
     }
     # note exoplanet.eu's "log_g" column actually means planetary surface gravity
 
     param_error_columns = {
         "dist": ("star_distance_error_min", "star_distance_error_max"),
+        "radius": ("radius_error_min", "radius_error_max"),
+        "mass": ("mass_error_min", "mass_error_max"),
+        "pl_mass": ("mass_sin_i_error_min", "mass_sin_i_error_max")
     }
 
     def download(self, key_list: list[str] = None) -> Table:

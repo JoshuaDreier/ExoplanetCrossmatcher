@@ -9,36 +9,18 @@ from crossmatching.enrichment.param_sources.epic import EpicParamSource
 
 def _epic_table(*rows):
     """Minimal k2pandc-shaped table for _build_lookup tests."""
+    
+    qty_list = ["st_teff", "st_rad", "st_mass", "st_lum", "st_spectype", "pl_insol", "pl_eqt",
+                "pl_massj", "pl_msinij", "sy_vmag", "sy_kmag", "sy_dist", "st_logg", "st_met"]
+    qty_list_errs = []
+    for i in qty_list:
+        qty_list_errs.append(i+"err1")
+        qty_list_errs.append(i+"err2")
+    
     return Table({
-        "pl_name":     [r["pl_name"]                for r in rows],
-        "st_teff":     [r.get("st_teff",    0.0)    for r in rows],
-        "st_tefferr1": [r.get("st_tefferr1", np.nan) for r in rows],
-        "st_tefferr2": [r.get("st_tefferr2", np.nan) for r in rows],
-        "st_rad":      [r.get("st_rad",     0.0)    for r in rows],
-        "st_raderr1":  [r.get("st_raderr1", np.nan) for r in rows],
-        "st_raderr2":  [r.get("st_raderr2", np.nan) for r in rows],
-        "st_mass":     [r.get("st_mass",    0.0)    for r in rows],
-        "st_masserr1": [r.get("st_masserr1", np.nan) for r in rows],
-        "st_masserr2": [r.get("st_masserr2", np.nan) for r in rows],
-        "st_spectype": [r.get("st_spectype", "")    for r in rows],
-        "pl_insol":    [r.get("pl_insol",   0.0)    for r in rows],
-        "pl_insolerr1":[r.get("pl_insolerr1", np.nan) for r in rows],
-        "pl_insolerr2":[r.get("pl_insolerr2", np.nan) for r in rows],
-        "sy_vmag":     [r.get("sy_vmag",    np.nan) for r in rows],
-        "sy_vmagerr1": [r.get("sy_vmagerr1", np.nan) for r in rows],
-        "sy_vmagerr2": [r.get("sy_vmagerr2", np.nan) for r in rows],
-        "sy_dist":     [r.get("sy_dist",    0.0)    for r in rows],
-        "sy_disterr1": [r.get("sy_disterr1", np.nan) for r in rows],
-        "sy_disterr2": [r.get("sy_disterr2", np.nan) for r in rows],
-        "st_logg":     [r.get("st_logg",    0.0)    for r in rows],
-        "st_loggerr1": [r.get("st_loggerr1", np.nan) for r in rows],
-        "st_loggerr2": [r.get("st_loggerr2", np.nan) for r in rows],
-        "st_met":      [r.get("st_met",     np.nan) for r in rows],
-        "st_meterr1":  [r.get("st_meterr1", np.nan) for r in rows],
-        "st_meterr2":  [r.get("st_meterr2", np.nan) for r in rows],
-        "pl_eqt":      [r.get("pl_eqt",    0.0)    for r in rows],
-        "pl_eqterr1":  [r.get("pl_eqterr1", np.nan) for r in rows],
-        "pl_eqterr2":  [r.get("pl_eqterr2", np.nan) for r in rows],
+        "pl_name":     [r["pl_name"] for r in rows], 
+        "st_spectype": [r.get("st_spectype", "") for r in rows],
+        **{key: [r.get(key, np.nan) for r in rows] for key in qty_list + qty_list_errs} 
     })
 
 
@@ -130,17 +112,17 @@ def test_asymmetric_errors_returned_separately():
     _loaded(src, _epic_table({"pl_name": "K2-7 b", "st_teff": 5000.0,
                                "st_tefferr1": 100.0, "st_tefferr2": -80.0}))
     result = src.get(_emc_row("K2-7 b"))
-    assert result["teff_err1"] == pytest.approx(100.0)
-    assert result["teff_err2"] == pytest.approx(80.0)
+    assert result["tefferr1"] == pytest.approx(100.0)
+    assert result["tefferr2"] == pytest.approx(80.0)
 
 
 def test_no_err_when_both_absent():
-    # No error columns provided → no *_err1/*_err2 keys
+    # No error columns provided → no *err1/*err2 keys
     src = EpicParamSource()
     _loaded(src, _epic_table({"pl_name": "K2-8 b", "st_teff": 5000.0}))
     result = src.get(_emc_row("K2-8 b"))
-    assert "teff_err1" not in result
-    assert "teff_err2" not in result
+    assert "tefferr1" not in result
+    assert "tefferr2" not in result
 
 
 def test_rad_err_returned_asymmetric():
@@ -148,8 +130,8 @@ def test_rad_err_returned_asymmetric():
     _loaded(src, _epic_table({"pl_name": "K2-9 b", "st_teff": 5000.0, "st_rad": 1.0,
                                "st_raderr1": 0.05, "st_raderr2": -0.04}))
     result = src.get(_emc_row("K2-9 b"))
-    assert result["rad_err1"] == pytest.approx(0.05)
-    assert result["rad_err2"] == pytest.approx(0.04)
+    assert result["raderr1"] == pytest.approx(0.05)
+    assert result["raderr2"] == pytest.approx(0.04)
 
 
 def test_met_err_zero_base_still_returns_err():
@@ -159,5 +141,5 @@ def test_met_err_zero_base_still_returns_err():
                                "st_meterr1": 0.05, "st_meterr2": -0.05}))
     result = src.get(_emc_row("K2-10 b"))
     assert "met" in result
-    assert result["met_err1"] == pytest.approx(0.05)
-    assert result["met_err2"] == pytest.approx(0.05)
+    assert result["meterr1"] == pytest.approx(0.05)
+    assert result["meterr1"] == pytest.approx(0.05)

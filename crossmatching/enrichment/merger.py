@@ -64,8 +64,8 @@ def _qty_from_table(
     q.src = src
     q.mask = not np.isfinite(q.val)
 
-    err1_col = f"{col}_{upper_error_suffix}"
-    err2_col = f"{col}_{lower_error_suffix}"
+    err1_col = f"{col}{upper_error_suffix}"
+    err2_col = f"{col}{lower_error_suffix}"
 
     q.err1 = (
         _to_float(table[err1_col][idx])
@@ -112,6 +112,9 @@ class ParamFiller:
         'pl_insol',
         'pl_eqt',
         'pl_a',
+        'pl_rad',
+        'pl_mass',
+        'msini'
     ]
 
     PARAM_NAMES_STRINGS = [
@@ -131,6 +134,9 @@ class ParamFiller:
         'sy_kmag':     ('kmag', '2MASS K-band magnitude [mag]'),
         'sy_dist':     ('distance', 'Distance [pc]'),
         'pl_a':        ('semi_major_axis', 'Orbital semi-major axis [AU]'),
+        'pl_rad':      ('planet_radius', 'Planet radius [R_Jup]'),
+        'pl_mass':     ('planet_mass', 'Planet masss [M_Jup]'),
+        'msini':       ('msini', 'Planet minimum mass [M_Jup]'),
         'pl_insol':    ('planet_flux', 'Planet insolation flux [S_earth]'),
         'pl_eqt':      ('planet_equilibrium_temperature', 'Planet equilibrium temperature [K]'),
         'st_spectype': ('star_spectral_type', 'Stellar spectral type')
@@ -149,6 +155,9 @@ class ParamFiller:
         "pl_insol": "insol",
         "pl_eqt": "pl_eqt",
         "pl_a": "a",
+        'pl_rad': 'pl_rad',
+        'pl_mass': 'pl_mass',
+        'msini': 'msini',
         "st_spectype": "spec",   
     }
 
@@ -160,6 +169,7 @@ class ParamFiller:
         self,
         *,
         planet_radius_key: str | None,
+        planet_mass_key: str | None,
         planet_flux_key: str | None,
         planet_equilibrium_temperature_key: str | None,
         semi_major_axis_key: str | None,
@@ -179,6 +189,7 @@ class ParamFiller:
     ) -> dict[str, str]:
         resolved = {
             "planet_radius": "pl_rad",
+            "planet_mass": "pl_mass",
             "planet_flux": "pl_insol",
             "planet_equilibrium_temperature": "pl_eqt",
             "semi_major_axis": "pl_a",
@@ -198,6 +209,7 @@ class ParamFiller:
 
         provided = {
             "planet_radius": planet_radius_key,
+            "planet_mass": planet_mass_key,
             "planet_flux": planet_flux_key,
             "planet_equilibrium_temperature": planet_equilibrium_temperature_key,
             "semi_major_axis": semi_major_axis_key,
@@ -233,17 +245,25 @@ class ParamFiller:
         resolved_cols: dict[str, str],
         upper_error_suffix: str,
         lower_error_suffix: str,
+        additional_params: list = [] 
     ) -> None:
-        for key in self.PARAM_NAMES_QUANTITIES:
-            canonical_name, desc = self.PARAM_METADATA[key]
-            col = resolved_cols[canonical_name]
+        for key in self.PARAM_NAMES_QUANTITIES + additional_params:
+            if key in self.PARAM_NAMES_QUANTITIES:
+                canonical_name, desc = self.PARAM_METADATA[key] 
+                col = resolved_cols[canonical_name] 
+            else: 
+                col = key
+                desc = ""
             params = params_q[key]
             values = [p.val for p in params]
             masks = [p.mask or not np.isfinite(p.val) for p in params]
             result[col] = MaskedColumn(values,mask=masks,name=col,description=desc,)
-            result[f"{col}_src"] = [p.src for p in params            ]
-            result[f"{col}_{upper_error_suffix}"] = _mc([p.err1 for p in params], f"{col}_{upper_error_suffix}")
-            result[f"{col}_{lower_error_suffix}"] = _mc([p.err2 for p in params], f"{col}_{lower_error_suffix}")
+            result[f"{col}_src"] = [p.src if not p.mask else '' for p in params]
+            # really hacky but works for current implementation
+            if key in additional_params:
+                continue
+            result[f"{col}{upper_error_suffix}"] = _mc([p.err1 for p in params], f"{col}{upper_error_suffix}")
+            result[f"{col}{lower_error_suffix}"] = _mc([p.err2 for p in params], f"{col}{lower_error_suffix}")
 
 
     def _populate_output_string_columns(
@@ -353,8 +373,8 @@ class ParamFiller:
                         continue
                     param.val = val
                     param.mask = False
-                    param.err1 = _to_float(data.get(f"{source_key}_{upper_error_suffix}"))
-                    param.err2 = _to_float(data.get(f"{source_key}_{lower_error_suffix}"))
+                    param.err1 = _to_float(data.get(f"{source_key}{upper_error_suffix}"))
+                    param.err2 = _to_float(data.get(f"{source_key}{lower_error_suffix}"))
                     param.src = source.source_name
 
                 for param_name in self.PARAM_NAMES_STRINGS:
@@ -375,6 +395,7 @@ class ParamFiller:
         self,
         table: Table,
         planet_radius_key: str | None = None,
+        planet_mass_key: str | None = None,
         planet_flux_key: str | None = None,
         planet_equilibrium_temperature_key: str | None = None,
         semi_major_axis_key: str | None = None,
@@ -622,6 +643,7 @@ class ParamFiller:
 
         resolved_cols = self._resolved_columns(
             planet_radius_key=planet_radius_key,
+            planet_mass_key=planet_mass_key,
             planet_flux_key=planet_flux_key,
             planet_equilibrium_temperature_key=planet_equilibrium_temperature_key,
             semi_major_axis_key=semi_major_axis_key,
@@ -720,10 +742,19 @@ class ParamFiller:
                 upper_error_suffix=upper_error_suffix,
                 lower_error_suffix=lower_error_suffix
             )
+            mass = _qty_from_table(
+                table,
+                resolved_cols["planet_mass"],
+                i,
+                src="input",
+                upper_error_suffix=upper_error_suffix,
+                lower_error_suffix=lower_error_suffix
+            )
 
             r_lower_bound[i], r_upper_bound[i] = infer_msini_radius_bounds(
                 planet_radius,
                 msini,
+                mass,
                 self.msini_sin_min
             )
 
@@ -754,13 +785,21 @@ class ParamFiller:
             for i in range(n)
         ]
         spectral_category = [classify_spectral_type(s) for s in displayed_spectypes]
+        
+        # 6. Insert extra derived columns.
 
-        # 6. Insert merged/inferred quantity columns.
-        self._populate_output_quantity_columns(result,params_q,resolved_cols,upper_error_suffix,lower_error_suffix)
+        params_q |= {
+            f"{resolved_cols["planet_radius"]}_lower_bound": r_lower_bound,
+            f"{resolved_cols["planet_radius"]}_upper_bound": r_upper_bound,
+        }
+
+        # 7. Insert merged/inferred quantity columns.
+        self._populate_output_quantity_columns(result,params_q,resolved_cols,upper_error_suffix,lower_error_suffix,
+            additional_params=[
+                f"{resolved_cols["planet_radius"]}_lower_bound",
+                f"{resolved_cols["planet_radius"]}_upper_bound"
+        ])
         self._populate_output_string_columns(result,params_s,resolved_cols,display_values={"st_spectype": displayed_spectypes,},)
         
-        # 7. Insert extra derived columns.
-        result[f"{resolved_cols["planet_radius"]}_lower_bound"] = _mc( [q.val for q in r_lower_bound],f"{resolved_cols["planet_radius"]}_lower_bound","Min estimated planet radius from msini [R_earth]")
-        result[f"{resolved_cols["planet_radius"]}_upper_bound"] = _mc( [q.val for q in r_upper_bound],f"{resolved_cols["planet_radius"]}_upper_bound", "Max estimated planet radius from msini [R_earth]")
         result["spectral_category"] = spectral_category
         return result

@@ -76,8 +76,8 @@ def test_dist_err_from_parallax_error():
                                   "plx_value": 200.0, "plx_err": 2.0}))
     result = src.get(_emc_row("Star"))
     assert result["dist"] == pytest.approx(5.0)
-    assert result["dist_err1"] == pytest.approx(0.05)
-    assert result["dist_err2"] == pytest.approx(0.05)
+    assert result["disterr1"] == pytest.approx(0.05)
+    assert result["disterr1"] == pytest.approx(0.05)
 
 
 def test_no_dist_err_when_plx_err_absent():
@@ -85,8 +85,8 @@ def test_no_dist_err_when_plx_err_absent():
     _loaded(src, _simbad_result({"main_id": "Star2", "teff": 4000.0, "plx_value": 100.0}))
     result = src.get(_emc_row("Star2"))
     assert "dist" in result
-    assert "dist_err1" not in result
-    assert "dist_err2" not in result
+    assert "disterr1" not in result
+    assert "disterr1" not in result
 
 
 def test_download_includes_plx_err_in_query():

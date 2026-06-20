@@ -1,6 +1,6 @@
 import pyvo
 from astropy.table import Table
-
+import astropy.units as u
 from crossmatching.enrichment.param_sources.base import (
     ParamSource,
     _build_nea_style_lookup,
@@ -29,6 +29,7 @@ class ToiParamSource(ParamSource):
         'dist': 'st_dist',
         'logg': 'st_logg',
         'pl_eqt': 'pl_eqt',
+        'pl_rad': 'pl_rade',
     }
 
     param_error_columns = {
@@ -38,6 +39,7 @@ class ToiParamSource(ParamSource):
         'dist': ('st_disterr1', 'st_disterr2'),
         'logg': ('st_loggerr1', 'st_loggerr2'),
         'pl_eqt': ('pl_eqterr1', 'pl_eqterr2'),
+        'pl_rad': ('pl_radeerr1', 'pl_radeerr2')
     }
 
     def download(self, key_list: list[str] = None) -> Table:
@@ -45,4 +47,9 @@ class ToiParamSource(ParamSource):
         return nasa.run_sync("SELECT * FROM toi").to_table()
 
     def _build_lookup(self, table: Table) -> dict:
-        return _build_nea_style_lookup(table, self.param_columns, self.param_error_columns, key_col='toidisplay')
+        lookup = _build_nea_style_lookup(table, self.param_columns, self.param_error_columns, key_col='toidisplay')
+        for _, valdict in lookup.items():
+            if "pl_rad" in valdict.keys():
+                valdict["pl_rad"] = valdict["pl_rad"]*u.Rearth.to(u.Rjup)
+        return lookup
+        # convert earth radii to jupiter radii

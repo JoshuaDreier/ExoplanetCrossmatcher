@@ -240,8 +240,8 @@ could_be_rocky = rocky_mask(
 
 is_temperate = temperate_mask(
     enriched["pl_insol"],
-    enriched["pl_insol_err1"],
-    enriched["pl_insol_err2"],
+    enriched["pl_insolerr1"],
+    enriched["pl_insolerr2"],
     lower=0.35,
     upper=1.77,
 )

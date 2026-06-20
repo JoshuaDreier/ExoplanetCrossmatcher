@@ -1,6 +1,7 @@
 DEFAULT_ENRICH_KEYS = {
     'planet_radius_key': 'r',
     'planet_flux_key': 'pl_insol',
+    'planet_mass_key': 'mass',
     'planet_equilibrium_temperature_key': 'pl_eqt',
     'semi_major_axis_key': 'a',
     'period_key': 'p',

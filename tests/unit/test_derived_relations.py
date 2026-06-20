@@ -91,8 +91,8 @@ def test_teff_derived_from_spectype():
     result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)
     assert "st_teff" in result.colnames
     assert float(result["st_teff"][0]) == pytest.approx(5780.0, rel=1e-4)
-    assert float(result["st_teff_err1"][0]) == pytest.approx(80.0, rel=1e-4)
-    assert float(result["st_teff_err2"][0]) == pytest.approx(120.0, rel=1e-4)
+    assert float(result["st_tefferr1"][0]) == pytest.approx(80.0, rel=1e-4)
+    assert float(result["st_tefferr2"][0]) == pytest.approx(120.0, rel=1e-4)
     assert "spectype_derived" in str(result["st_teff_src"][0])
 
 
@@ -105,8 +105,8 @@ def test_teff_derived_from_rad_and_lum():
     result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)
     assert "st_teff" in result.colnames
     assert float(result["st_teff"][0]) == pytest.approx(5778.0, rel=1e-4)
-    assert float(result["st_teff_err1"][0]) == pytest.approx(210.7609, rel=1e-4)
-    assert float(result["st_teff_err2"][0]) == pytest.approx(192.4066, rel=1e-4)
+    assert float(result["st_tefferr1"][0]) == pytest.approx(210.7609, rel=1e-4)
+    assert float(result["st_tefferr2"][0]) == pytest.approx(192.4066, rel=1e-4)
     assert "StephanBoltzmann_derived" in str(result["st_teff_src"][0])
 
 
