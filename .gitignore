@@ -172,3 +172,10 @@ pscomppars.txt
 # Generative AI
 CLAUDE.md
 .claude/
+
+.obsidian/
+
+.vscode/
+Latex Suite Settings.md
+
+notebooks/
