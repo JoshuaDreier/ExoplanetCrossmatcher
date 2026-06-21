@@ -23,6 +23,7 @@ from crossmatching.enrichment import (
 from crossmatching.enrichment.param_sources.hpic import HpicParamSource
 from crossmatching.enrichment.param_sources.nea import NeaParamSource
 from crossmatching.enrichment.param_sources.simbad import SimbadParamSource
+from crossmatching import EMCCatalog
 
 _MSINI_D = 1.27 / u.M_jup.to(u.M_earth)  # 1.27 M_Earth expressed in M_Jup
 
@@ -146,7 +147,7 @@ def test_all_enriched_columns_present(enriched: Table):
         "r", "r_src", "rerr1", "rerr2", 
         "msini", "msini_src", "msinierr1", "msinierr2", 
         "r_lower_bound", "r_lower_bound_src", "r_upper_bound", "r_upper_bound_src", 
-        "st_spectype", "st_spectype_src", "spectral_category",
+        "st_spectype", "st_spectype_src", "normalized_st_spectype", "spectral_category", 
     ):
         assert col in enriched.colnames, f"missing column: {col}"
 
@@ -163,7 +164,7 @@ def test_enrich_handles_missing_planet_columns():
         "nasa_name":       ["Planet A"],
         "main_id":         [""],
     })
-    result = ParamFiller([nea]).enrich(catalog, **EMCCa)
+    result = ParamFiller([nea]).enrich(catalog, **DEFAULT_ENRICH_KEYS)
     assert np.ma.is_masked(result["r_lower_bound"][0])
     assert np.ma.is_masked(result["r_upper_bound"][0])
     assert str(result["a_src"][0]) == ""

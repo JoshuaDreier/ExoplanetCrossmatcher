@@ -139,8 +139,8 @@ def classify_spectral_type(sptype: str) -> str:
 
 def spectype_display(spec: str, teff: float) -> str:
     """Spectral type for display: use the actual string if available, else derive from teff."""
-    s = str(spec).strip()
-    if s and s != 'null':
+    s = standardize_spectral_type(spec)
+    if s:
         return s
     return teff_to_spectype(teff)
 

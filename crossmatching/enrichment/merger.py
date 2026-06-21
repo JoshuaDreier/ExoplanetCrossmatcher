@@ -636,7 +636,8 @@ class ParamFiller:
 
             The following columns don't offer any source columns:
             * ``r_lower_bound``, ``r_upper_bound`` are computed from planet mass or ``msini``.
-            * The ``spectral_category`` column is derived from the stellar spectral type column.
+            * The ``normalized_st_spectyp`` column is derived either from the spectral type or inferred from ``st_teff`` (then it's prepended with `~`)
+            * The ``spectral_category`` column is derived from the normalized spectral type column.
 
             If ``disable_calculations`` is True, no derived-source strings are
             produced because no ``infer_*`` functions are called. In that case,
@@ -707,10 +708,11 @@ class ParamFiller:
 
             return result
     
-        # 3. Fundamental stellar inferences.
         r_lower_bound = [ParamQty() for _ in range(n)]
         r_upper_bound = [ParamQty() for _ in range(n)]
 
+
+        # 3. Inferences.
         displayed_spectypes: list[str] | None = None
         spectral_category: list[str] | None = None
         for i in range(n):
@@ -732,13 +734,7 @@ class ParamFiller:
                 *(params_q[k][i] for k in ["st_lum","st_rad",  "st_teff"]),
             )
 
-            # 4. Planetary and orbital derived quantities.
-
-            r_lower_bound[i], r_upper_bound[i] = infer_msini_radius_bounds(
-                *(params_q[k][i] for k in ["pl_rad", "msini", "pl_mass"]),
-                self.msini_sin_min
-            )
-
+            # Planetary properties
             params_q["pl_a"][i] = infer_semi_major_axis(
                 *(params_q[k][i] for k in ["pl_a","period","st_mass"]),
                 period_src=resolved_cols["period"]
@@ -748,6 +744,12 @@ class ParamFiller:
                 *(params_q[k][i] for k in ["pl_insol", "st_lum", "pl_a", "pl_eqt"]),
             )
             params_q["pl_eqt"][i] = infer_planet_equilibrium_temperature(params_q["pl_eqt"][i], params_q["pl_insol"][i], )
+
+            # 4. Radius bounds
+            r_lower_bound[i], r_upper_bound[i] = infer_msini_radius_bounds(
+                *(params_q[k][i] for k in ["pl_rad", "msini", "pl_mass"]),
+                self.msini_sin_min
+            )
 
         # 5. Display spectral type and classify it.
         displayed_spectypes = [
@@ -770,6 +772,6 @@ class ParamFiller:
                 f"{resolved_cols["planet_radius"]}_upper_bound"
         ])
         self._populate_output_string_columns(result,params_s,resolved_cols,display_values={"st_spectype": displayed_spectypes,},)
-        
+        result[f"normalized_{resolved_cols["star_spectral_type"]}"] = displayed_spectypes
         result["spectral_category"] = spectral_category
         return result
