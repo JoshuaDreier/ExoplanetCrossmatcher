@@ -23,10 +23,10 @@ from crossmatching.enrichment import NeaParamSource, SimbadParamSource, HpicPara
 emc_result = cme.combined_crossmatch(input_table, input_starname_key="star_name")
 
 nea_src = NeaParamSource()
-nea_src.load(from_file="pscomppars.txt", format="ascii")
+nea_src.load(from_file="./input/pscomppars.txt", format="ascii")
 
 simbad_src = SimbadParamSource()
-simbad_src.load(from_file="simbad_params.txt", format="ascii")
+simbad_src.load(from_file="./input/simbad_params.txt", format="ascii")
 
 hpic_src = HpicParamSource(emc_result)
 hpic_src.load()
@@ -72,7 +72,7 @@ from crossmatching import ParamFiller
 from crossmatching.enrichment import NeaParamSource
 
 nea_src = NeaParamSource()
-nea_src.load(from_file="pscomppars.txt", format="ascii")
+nea_src.load(from_file="./input/pscomppars.txt", format="ascii")
 
 enriched = ParamFiller([nea_src]).enrich(table, **NEACatalog.ENRICH_KEYS)
 ```

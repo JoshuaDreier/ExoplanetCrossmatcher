@@ -9,7 +9,7 @@ Downloads the NASA Exoplanet Archive `pscomppars` composite-parameters table.
 from crossmatching import NEACatalog
 
 catalog = NEACatalog()
-table = catalog.load(from_file="pscomppars.txt")  # from cache
+table = catalog.load(from_file="./input/pscomppars.txt")  # from cache
 # or: table = catalog.load()                      # downloads from TAP (~1.5 min)
 ```
 
@@ -39,7 +39,7 @@ using this priority order:
 **Saving a local cache**
 
 ```python
-NEACatalog().save_raw("pscomppars.txt")
+NEACatalog().save_raw("./input/pscomppars.txt")
 ```
 
 
@@ -52,7 +52,7 @@ Note that at time of writing the [Exo-MerCat TAP](https://exo-mercat.readthedocs
 from crossmatching import EMCCatalog
 
 catalog = EMCCatalog()
-table = catalog.load(from_file="exo-mercat.csv")
+table = catalog.load(from_file="./input/exo-mercat.csv")
 ```
 
 

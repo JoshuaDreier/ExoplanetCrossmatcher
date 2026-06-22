@@ -54,12 +54,12 @@ cm = Crossmatcher(
 
 
 
-cm.catalog.save_raw("pscomppars.txt") # this line only needs to run once, or when newer catalog data is wanted
-cm.load_catalog(from_file="pscomppars.txt")
+cm.catalog.save_raw("./input/pscomppars.txt") # this line only needs to run once, or when newer catalog data is wanted
+cm.load_catalog(from_file="./input/pscomppars.txt")
 
 
-cm.id_supplier.save_raw(hpic["star_name"], "alternate_ids_hpic.txt") # this line only needs to run once, or when catalog ids changed
-cm.load_alternate_ids(input_table["star_name"], from_file="alternate_ids_hpic.txt")
+cm.id_supplier.save_raw(hpic["star_name"], "./input/alternate_ids_hpic.txt") # this line only needs to run once, or when catalog ids changed
+cm.load_alternate_ids(input_table["star_name"], from_file="./input/alternate_ids_hpic.txt")
 
 # Run the combined crossmatch (ID-based first, then coordinate-based)
 result = cm.combined_crossmatch(input_table, input_starname_key="star_name")
@@ -107,7 +107,7 @@ catalog = EMCCatalog()
 # catalog = EMCCatalog(allowed_statuses=["CONFIRMED", "CANDIDATE", "CONTROVERSIAL", "FALSE POSITIVE", "PRELIMINARY"])
 
 cme = Crossmatcher(catalog, EMCIdSupplier(), default_search_radius=50*u.arcsec)
-cme.load_catalog(from_file="./exo-mercat.csv")
+cme.load_catalog(from_file="././input/exo-mercat.csv")
 
 cme.load_alternate_ids(input_table["star_name"], from_file=".input/exo-mercat2026-06-14.csv")
 
@@ -147,9 +147,15 @@ The full user documentation lives in [`docs/`](docs/):
 | [Architecture](docs/architecture.md)         | Package layout, data-flow                             |
 | [Catalogs](docs/catalogs.md)                 | `NEACatalog`, `FileCatalog`, `EMCCatalog`             |
 | [ID Suppliers](docs/id-suppliers.md)         | `SimbadIdSupplier`, `EMCIdSupplier`                   |
+| [Enrichment](docs/enrichment.md)             | `ParamFiller`, parameter sources, derived columns, candidate masks |
+| [Derived Parameter Inference](docs/derived-parameter-inference.md) | Formulas and citations for enrichment fallback calculations |
 | [Detect Duplicates](detect-duplicates.md)    | Detection and deletion of duplicates based on aliases |
 | [Configuration](docs/configuration.md)       | `crossmatching.cfg` keys and override patterns        |
 | [Testing](docs/testing.md)                   | Types of tests, how to run                            |
+
+### Enriching Crossmatch Results
+
+After crossmatching, use `ParamFiller` with one or more parameter sources to fill stellar parameters, derive missing luminosity/flux/equilibrium-temperature values, estimate broad `msini` radius bounds, and apply rocky/temperate masks. The built-in `EMCCatalog.ENRICH_KEYS` and `NEACatalog.ENRICH_KEYS` mappings keep catalogue column names aligned with the enrichment API; see [docs/enrichment.md](docs/enrichment.md) for examples and caveats.
 
 
 ## Link to TAP services table definitions

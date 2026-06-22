@@ -10,10 +10,10 @@ from crossmatching import SimbadIdSupplier
 supplier = SimbadIdSupplier()
 
 # Download for a list of star names and save to disk (~1.5 minutes for 15 000 stars)
-supplier.save_raw(name_list, "alternate_ids_hpic.txt")
+supplier.save_raw(name_list, "./input/alternate_ids_hpic.txt")
 
 # Load from cache on subsequent runs
-ids = supplier.load_alternate_ids(name_list, from_file="alternate_ids_hpic.txt")
+ids = supplier.load_alternate_ids(name_list, from_file="./input/alternate_ids_hpic.txt")
 ```
 The raw result is a two-column table: `input_ids` (input name) and `ids` (pipe-delimited SIMBAD identifiers).
 When loaded this is then expanded into more rows with each input_id and alias pair occupying one row.
@@ -42,7 +42,7 @@ Derives alternate IDs directly from Exo-MerCat's `main_id_aliases` column.  No S
 from crossmatching import EMCIdSupplier
 
 supplier = EMCIdSupplier()
-ids = supplier.load_alternate_ids(name_list, from_file="exo-mercat.csv")
+ids = supplier.load_alternate_ids(name_list, from_file="./input/exo-mercat.csv")
 ```
 
 `EMCIdSupplier` has no `download()` method; `from_file=` is required.

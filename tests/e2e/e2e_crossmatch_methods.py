@@ -15,9 +15,9 @@ class _Config(NamedTuple):
 
 CONFIGS = [
     _Config(NEACatalog, SimbadIdSupplier, "tests/data/pscomppars_20260611.txt", "ascii", "tests/data/alternate_ids_hpic_20260611.txt", "nea_expected_planets", "nea-simbad"),
-    _Config(NEACatalog, EMCIdSupplier,    "tests/data/pscomppars_20260611.txt", "ascii", "exo-mercat.csv",                              "nea_expected_planets", "nea-emc"),
-    _Config(EMCCatalog, SimbadIdSupplier, "exo-mercat.csv",                     "csv",   "tests/data/alternate_ids_hpic_20260611.txt",  "emc_expected_planets", "emc-simbad"),
-    _Config(EMCCatalog, EMCIdSupplier,    "exo-mercat.csv", "csv",   "exo-mercat.csv",           "emc_expected_planets", "emc-emc"),
+    _Config(NEACatalog, EMCIdSupplier,    "tests/data/pscomppars_20260611.txt", "ascii", "./input/exo-mercat.csv", "nea_expected_planets", "nea-emc"),
+    _Config(EMCCatalog, SimbadIdSupplier, "./input/exo-mercat.csv", "csv",   "tests/data/alternate_ids_hpic_20260611.txt",  "emc_expected_planets", "emc-simbad"),
+    _Config(EMCCatalog, EMCIdSupplier,    "./input/exo-mercat.csv", "csv",   "./input/exo-mercat.csv", "emc_expected_planets", "emc-emc"),
 ]
 
 

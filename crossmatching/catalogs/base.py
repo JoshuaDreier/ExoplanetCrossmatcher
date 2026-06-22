@@ -9,7 +9,7 @@ class CatalogBase:
     information.  The canonical usage pattern is::
 
         catalog = NEACatalog()
-        table = catalog.load(from_file="pscomppars.txt")  # from cache
+        table = catalog.load(from_file="./input/pscomppars.txt")  # from cache
         # or
         table = catalog.load()  # downloads from remote TAP
 

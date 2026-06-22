@@ -6,7 +6,7 @@ Full pipeline:
   → StellarParamMerger.enrich()
   → rocky_mask(use_interval=True) and temperate_mask() both True for Proxima Cen b
 
-Uses only exo-mercat.csv (cached file, no network). The test is skipped
+Uses only ./input/exo-mercat.csv (cached file, no network). The test is skipped
 automatically if the file is absent from the working directory.
 """
 import os

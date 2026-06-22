@@ -11,7 +11,7 @@ class SimbadParamSource(ParamSource):
     Queries basic + mesFe_h + allfluxes for a batch of main_id strings.
     Lookup key is the EMC 'main_id' column.
     Provides: teff, logg, met, spec, dist, vmag, kmag; rad is derived via ms_radius_from_teff.
-    Note: cached simbad_params.txt files without 'logg' or 'fe_h' columns are still
+    Note: cached ./input/simbad_params.txt files without 'logg' or 'fe_h' columns are still
     readable (missing fields are silently skipped). Re-download to get metallicity.
     """
     key_col = "main_id"
