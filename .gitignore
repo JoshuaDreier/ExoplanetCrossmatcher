@@ -166,9 +166,6 @@ cython_debug/
 .vercel
 
 
-alternate_id*.txt
-pscomppars.txt
-
 # Generative AI
 CLAUDE.md
 .claude/
