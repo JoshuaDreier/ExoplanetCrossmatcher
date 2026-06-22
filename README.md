@@ -107,7 +107,7 @@ catalog = EMCCatalog()
 # catalog = EMCCatalog(allowed_statuses=["CONFIRMED", "CANDIDATE", "CONTROVERSIAL", "FALSE POSITIVE", "PRELIMINARY"])
 
 cme = Crossmatcher(catalog, EMCIdSupplier(), default_search_radius=50*u.arcsec)
-cme.load_catalog(from_file="././input/exo-mercat.csv")
+cme.load_catalog(from_file="./input/exo-mercat.csv")
 
 cme.load_alternate_ids(input_table["star_name"], from_file=".input/exo-mercat2026-06-14.csv")
 
