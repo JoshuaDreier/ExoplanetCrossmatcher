@@ -1,0 +1,103 @@
+
+%%{init: {"theme": "base", "layout": "elk", "elk": {"nodePlacementStrategy": "BRANDES_KOEPF"}}}%%
+flowchart TB
+    subgraph CAT["EMC Catalog"]
+            direction LR
+            R_J["$$r_p$$"]
+            MSI["$$m\sin i$$"]
+            A_C["$$a$$"]
+            P_C["$$P$$"]
+        end
+    subgraph SRCS["Stellar Param Sources"]
+        direction TB
+        subgraph CATS["Input Catalogs"]
+            direction TB
+            NEA["<b>NASA Exoplanet Archive</b>"]
+            EPIC["<b>EPIC (K2)</b>"]
+            TOI["<b>TOI (TESS)</b>"]
+            SIM["<b>SIMBAD</b>"]
+        end
+        NEA  -->|"5949"| KMAG["K mag"]
+        EPIC -->|"970"| KMAG
+        SIM  -->|"8143"| KMAG
+        NEA  -->|"2284"| SPEC["spec type"]
+        EPIC -->|"141"| SPEC
+        SIM  -->|"2897"| SPEC
+        TEFF -->|"10810"| SPEC
+        NEA  -->|"5944"| TEFF["$$T_{\mathrm{eff}}$$"]
+        EPIC -->|"544"| TEFF
+        TOI  -->|"5329"| TEFF
+        SIM  -->|"2521"| TEFF
+        NEA  -->|"5918"| LOGG["$$\log g$$"]
+        EPIC -->|"430"| LOGG
+        TOI  -->|"4816"| LOGG
+        SIM  -->|"2551"| LOGG
+        NEA  -->|"5615"| MET["$$[\text{Fe/H}]$$"]
+        EPIC -->|"249"| MET
+        TOI  -->|"0"| MET
+        SIM  -->|"3489"| MET
+        NEA  -->|"5922"| RSTAR["$$R_\star$$"]
+        EPIC -->|"960"| RSTAR
+        TOI  -->|"5056"| RSTAR
+        TEFF --> |"458"| ZAMS["<b>[4] ZAMS Fallback</b><br/>$$R_\star\approx(T_{\mathrm{eff}}/T_\odot)^{n(spec)}$$"]
+        SPEC -->|"215"| ZAMS
+        ZAMS -. "458" .-> RSTAR
+        KMAG -->|"234"| MANN["<b>[1] Mann Mks</b><br/>$$R_\star=f(M_{K_s},[\text{Fe/H}])$$"]
+        MET  -->|"143"| MANN
+        MANN -. "234" .-> RSTAR
+        TEFF -->|"272"| MANNTEFF["<b>[3] Mann Teff</b><br/>$$R_\star=f(T_{\text{eff}},[\text{Fe/H}])$$"]
+        MET  -->|"19"| MANNTEFF
+        MANNTEFF -. "272" .-> RSTAR
+        TEFF -->|"1877"| TORRES["<b>[2] Torres 2010</b><br/>$$R_\star=f(T_{\text{eff}},\log g,[\text{Fe/H}])$$"]
+        LOGG -->|"1877"| TORRES
+        MET  -->|"1787"| TORRES
+        TORRES -. "1877" .-> RSTAR
+        NEA  -->|"6216"| MSTAR["$$M_\star$$"]
+        EPIC -->|"288"| MSTAR
+        LOGG  --> |"7501"| MLOG["$$M_\star=10^{\log g-\log g_\odot+2\log_{10}R_\star}$$"]
+        RSTAR --> |"7501"| MLOG
+        MLOG  -. "7501" .-> MSTAR
+        NEA   -->|"5927"| LSTAR["$$L_\star$$"]
+        EPIC  -->|"111"| LSTAR
+        RSTAR -->|"8622"| LUM["$$L_\star=R_\star^2(T_{\mathrm{eff}}/T_\odot)^4$$"]
+        TEFF  --> |"8622"| LUM
+        LUM   -. "8622" .-> LSTAR
+    end
+
+    FCALC["$$F=L_\star/a^2$$"]
+    MSTAR -->|"5930"| KEPL["$$a = \left(M_\star \left(\frac{P}{{yr}}\right)^2\right)^{1/3}$$"]
+    P_C   -->|"14811"| KEPL
+
+    A_C  -->|"8672"| AFIN["$$a$$"]
+    KEPL -. "5930" .-> AFIN
+    AFIN  -->|"8672"| FCALC
+    AFIN  -. "5930" .-> FCALC
+    LSTAR  -->|"6038"| FCALC
+    LSTAR  -. "8622" .-> FCALC
+
+    subgraph CLASS["Classification"]
+        direction LR
+        ROCKY[/"rocky$$\; r_p\in[0.5,1.5]\,R_\oplus$$"/]
+        TEMP[/"temperate$$\; F_{\mathrm{rel}}\in[0.35,1.7]\,S_\oplus$$"/]
+    end
+
+    NEA   -->|"4408"| FLUX["$$F_{\mathrm{rel}}$$"]
+    EPIC  -->|"30"| FLUX
+    TOI   -->|"5352"| FLUX
+    FCALC -. "4489" .-> FLUX
+    FLUX  -->|"9790"| TEMP
+    FLUX  -. "4489" .-> TEMP
+
+    R_J -->|"12771"| REARTH["$$r_p$$ (or bounds)"]
+    MSI -->|"1771"| CK["M-R-rel + msini + i prior [1,2]"]
+    CK  -. "1771" .-> REARTH
+    REARTH  -->|"12771"| ROCKY
+    REARTH  -. "1771" .-> ROCKY
+    style NEA  fill:#dde8f7,stroke:#1a6fba,color:#1a6fba
+    style EPIC fill:#fde9dc,stroke:#d4550d,color:#d4550d
+    style TOI  fill:#dcf5dc,stroke:#2a8a2a,color:#2a8a2a
+    style SIM  fill:#f0e0fa,stroke:#7b42a8,color:#7b42a8
+    linkStyle 0,3,7,11,15,19,35,40,53 stroke:#1a6fba,stroke-width:2px
+    linkStyle 1,4,8,12,16,20,36,41,54 stroke:#d4550d,stroke-width:2px
+    linkStyle 9,13,17,21,55 stroke:#2a8a2a,stroke-width:2px
+    linkStyle 2,5,10,14,18 stroke:#7b42a8,stroke-width:2px

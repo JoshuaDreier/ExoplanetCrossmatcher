@@ -175,5 +175,6 @@ CLAUDE.md
 .vscode/
 Latex Suite Settings.md
 
-notebooks/
 .trash/
+# commented out on purpose on thos branch
+# notebooks/
