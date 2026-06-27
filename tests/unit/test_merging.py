@@ -4,6 +4,9 @@ from crossmatching.enrichment.merger import ParamFiller
 from crossmatching.enrichment.inference import ParamQty, ParamStr
 
 class MockSource:
+    error_upper_suffix = 'err1'
+    error_lower_suffix = 'err2'
+
     def __init__(self, name, data):
         self.source_name = name
         self.data = data

@@ -296,3 +296,113 @@ def test_torres_metallicity_effect():
     r_metrich  = _torres_radius(5778.0, 4.438,  0.5)
     # Metal-rich stars are slightly larger; metal-poor slightly smaller
     assert r_metrich > r_solar > r_metpoor
+
+
+# --- Source error propagation (regression for suffix-mismatch bug) ---
+#
+# Parameters without inference fallbacks (logg, met, vmag, dist) can only
+# receive errors from _merge_values.  The bug was that _merge_values looked up
+# errors using the *table-level* suffix (e.g. "_max") rather than the source
+# dict's internal convention ("err1"/"err2"), so errors were silently dropped.
+
+import numpy as np
+import pytest
+from astropy.table import Table
+from tests.enrich_keys import DEFAULT_ENRICH_KEYS
+from crossmatching.enrichment import ParamFiller
+from crossmatching.enrichment.param_sources.base import ParamSource
+
+
+class _FixedParamSource(ParamSource):
+    """Minimal toy source returning pre-specified params for a single key."""
+
+    key_col = "main_id"
+    source_name = "test_src"
+
+    def __init__(self, data: dict):
+        self._lookup = data
+
+    def download(self, key_list):
+        raise NotImplementedError
+
+    def _build_lookup(self, table):
+        return {}
+
+
+@pytest.fixture(scope="module")
+def _enriched_with_source_errors():
+    """Enrich a one-row table whose source supplies errors for logg/met/vmag/dist."""
+    src = _FixedParamSource({
+        "HD 1234": {
+            "teff": 5500.0, "tefferr1": 80.0, "tefferr2": 80.0,
+            "rad":  1.05,   "raderr1":  0.03, "raderr2":  0.03,
+            "logg": 4.40,   "loggerr1": 0.05, "loggerr2": 0.05,
+            "met":  0.10,   "meterr1":  0.02, "meterr2":  0.02,
+            "vmag": 8.50,   "vmagerr1": 0.01, "vmagerr2": 0.01,
+            "dist": 45.0,   "disterr1": 1.0,  "disterr2": 1.0,
+        }
+    })
+
+    table = Table({
+        "main_id": ["HD 1234"],
+        "st_rad":  [np.nan],
+        "st_mass": [np.nan],
+        "st_teff": [np.nan],
+        "st_logg": [np.nan],
+        "st_met":  [np.nan],
+        "sy_vmag": [np.nan],
+        "sy_dist": [np.nan],
+        "r":       [np.nan],
+        "a":       [np.nan],
+        "p":       [np.nan],
+        "msini":   [np.nan],
+    })
+
+    merger = ParamFiller([src])
+    return merger.enrich(table, **DEFAULT_ENRICH_KEYS, disable_calculations=True)
+
+
+@pytest.mark.parametrize("col,expected_err", [
+    ("st_logg", 0.05),
+    ("st_met",  0.02),
+    ("sy_vmag", 0.01),
+    ("sy_dist", 1.0),
+    ("st_teff", 80.0),
+])
+def test_source_errors_propagated_to_output(col, expected_err, _enriched_with_source_errors):
+    """Source-provided errors must appear in both upper and lower error columns."""
+    out = _enriched_with_source_errors
+    upper_col = f"{col}err1"
+    lower_col  = f"{col}err2"
+    assert upper_col in out.colnames, f"Missing column {upper_col}"
+    assert lower_col  in out.colnames, f"Missing column {lower_col}"
+    assert not np.ma.getmaskarray(out[upper_col])[0], f"{upper_col} is masked (no error propagated)"
+    assert not np.ma.getmaskarray(out[lower_col])[0],  f"{lower_col} is masked (no error propagated)"
+    assert float(out[upper_col][0]) == pytest.approx(expected_err, rel=1e-6)
+    assert float(out[lower_col][0]) == pytest.approx(expected_err, rel=1e-6)
+
+
+def test_source_with_custom_error_suffix(monkeypatch):
+    """A source declaring a non-default error_upper/lower_suffix is respected."""
+    src = _FixedParamSource({
+        "HD 9999": {
+            "logg": 4.30,
+            "logg_upper": 0.08,  # custom suffix
+            "logg_lower": 0.06,
+        }
+    })
+    monkeypatch.setattr(src, "error_upper_suffix", "_upper")
+    monkeypatch.setattr(src, "error_lower_suffix", "_lower")
+
+    table = Table({
+        "main_id": ["HD 9999"],
+        "st_logg": [np.nan],
+        "st_rad":  [np.nan], "st_mass": [np.nan], "st_teff": [np.nan],
+        "st_met":  [np.nan], "sy_vmag": [np.nan], "sy_dist": [np.nan],
+        "r": [np.nan], "a": [np.nan], "p": [np.nan], "msini": [np.nan],
+    })
+
+    out = ParamFiller([src]).enrich(table, **DEFAULT_ENRICH_KEYS, disable_calculations=True)
+    assert float(out["st_loggerr1"][0]) == pytest.approx(0.08, rel=1e-6)
+    assert float(out["st_loggerr2"][0]) == pytest.approx(0.06, rel=1e-6)
+

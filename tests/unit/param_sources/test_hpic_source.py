@@ -6,7 +6,7 @@ from crossmatching.enrichment.param_sources.hpic import HpicParamSource
 
 
 def _crossmatch_table(*rows):
-    """Minimal crossmatch-output table accepted by HpicStellarParamSource."""
+    """Minimal crossmatch-output table accepted by HpicParamSource."""
     names = [r["name"] for r in rows]
     teff  = [r.get("st_teff",   0.0) for r in rows]
     rad   = [r.get("st_rad",    0.0) for r in rows]

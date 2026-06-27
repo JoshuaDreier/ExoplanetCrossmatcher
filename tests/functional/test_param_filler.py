@@ -1,4 +1,4 @@
-"""Integration tests for StellarParamMerger with toy source tables and uncertainty propagation.
+"""Integration tests for ParamFiller with toy source tables and uncertainty propagation.
 
 Four planets exercise the full tier precedence and msini radius estimation:
   Planet A — present in all three sources; HPIC wins for stellar params, NEA fills insol/mass

@@ -23,7 +23,7 @@ class HpicParamSource(ParamSource):
         self._table = crossmatch_table
 
     def download(self, key_list: list[str]) -> Table:
-        raise NotImplementedError("HpicStellarParamSource uses an in-memory table only")
+        raise NotImplementedError("HpicParamSource uses an in-memory table only")
 
     def load(self, key_list=None, from_file=None, format="ascii") -> Table:
         table = self.preprocess(self._table)

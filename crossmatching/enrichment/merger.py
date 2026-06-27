@@ -370,14 +370,13 @@ class ParamFiller:
                         continue
                     param = params_q[param_name][i]
                     val = _to_float(data[source_key])
-                    if not np.isfinite(param.val):
-                        continue
                     if not param.mask and np.isfinite(param.val):
                         continue
                     param.val = val
-                    param.mask = False
-                    param.err1 = _to_float(data.get(f"{source_key}{upper_error_suffix}"))
-                    param.err2 = _to_float(data.get(f"{source_key}{lower_error_suffix}"))
+                    param.mask = not np.isfinite(val)
+                    # Use the source's declared internal error-key convention.
+                    param.err1 = _to_float(data.get(f"{source_key}{source.error_upper_suffix}"))
+                    param.err2 = _to_float(data.get(f"{source_key}{source.error_lower_suffix}"))
                     param.src = source.source_name
 
                 for param_name in self.PARAM_NAMES_STRINGS:

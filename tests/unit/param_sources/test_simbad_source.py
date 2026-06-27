@@ -8,7 +8,7 @@ from crossmatching.enrichment.param_sources.simbad import SimbadParamSource
 
 
 def _simbad_result(*rows):
-    """Fake SIMBAD TAP result matching the query in SimbadStellarParamSource.download()."""
+    """Fake SIMBAD TAP result matching the query in SimbadParamSource.download()."""
     mids    = [r["main_id"]              for r in rows]
     teff    = [r.get("teff",      np.nan) for r in rows]
     spec    = [r.get("sp_type",       "") for r in rows]

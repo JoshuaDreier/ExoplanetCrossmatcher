@@ -2,8 +2,8 @@
 
 Full pipeline:
   EMCCatalog + EMCIdSupplier → crossmatch TIC 388857263 (Proxima Centauri)
-  → HpicStellarParamSource (HPIC stellar params from query row)
-  → StellarParamMerger.enrich()
+  → HpicParamSource (HPIC stellar params from query row)
+  → ParamFiller.enrich()
   → rocky_mask(use_interval=True) and temperate_mask() both True for Proxima Cen b
 
 Uses only ./input/exo-mercat.csv (cached file, no network). The test is skipped

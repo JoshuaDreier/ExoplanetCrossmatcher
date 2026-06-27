@@ -155,6 +155,12 @@ class ParamSource:
     key_col: str      # column in the catalog row used as lookup key
     source_name: str  # short label used in *_src provenance columns (e.g. "nea", "epic")
 
+    # Suffixes appended to a field name to form error keys inside the lookup dict
+    # (e.g. "logg" + error_upper_suffix -> "loggerr1").
+    # Must match what _build_lookup stores; override in subclasses if the convention differs.
+    error_upper_suffix: str = "err1"
+    error_lower_suffix: str = "err2"
+
     param_columns: dict[str, str] = {}
     param_error_columns: dict[str, tuple[str, str]] = {}
 
