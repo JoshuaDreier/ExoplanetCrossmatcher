@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68", "setuptools-scm>=8"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "crossmatching"
+version = "0.1.0"
+description = "Astronomical catalog crossmatching: identifies exoplanet host stars by matching stellar surveys against planet catalogs via ID-based and coordinate-based strategies."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+dependencies = [
+    "astropy>=7.2",
+    "astroquery>=0.4.11",
+    "pyvo>=1.8",
+    "pandas>=3.0",
+    "scipy>=1.17",
+    "pyarrow>=23.0",
+]
+
+[project.optional-dependencies]
+viz = [
+    "matplotlib>=3.10",
+    "plotly>=6.7",
+    "ipydatagrid>=1.4",
+    "jupyter>=1.1",
+]
+dev = [
+    "pytest>=9.0",
+    "pytest-mock>=3.15",
+    "pytest-check>=2.8",
+    "pytest-cov>=7.1",
+    "pytest-xdist>=3.8",
+]
+
+[tool.setuptools.packages.find]
+# Run from crossmatching/ — the package root is "." so find discovers
+# crossmatching, crossmatching.catalogs, crossmatching.id_suppliers,
+# crossmatching.enrichment, crossmatching.enrichment.param_sources
+where = [".."]
+include = ["crossmatching*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "-n auto"
+markers = [
+    "network: marks tests that require a live network connection (deselect with -m 'not network')",
+]
+
+[tool.coverage.run]
+source = ["crossmatching"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
