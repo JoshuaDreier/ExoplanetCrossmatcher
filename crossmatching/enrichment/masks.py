@@ -89,12 +89,12 @@ def rocky_mask(
         if bound_arr is None:
             return np.full(len(r), np.nan)
 
-        bound_arr = np.ma.asanyarray(bound_arr)        
+        bound_arr = np.ma.asanyarray(bound_arr)   
+        mean_arr = np.ma.asanyarray(mean)     
         for i, b in enumerate(bound_arr):
-            if not b or bound_arr.mask[i]:
-                if mean[i]: 
+            if (not b or bound_arr.mask[i]) and mean_arr[i] and not mean_arr.mask[i]:
                     unc = uncertainty[i] if uncertainty else 0
-                    bound_arr[i] = mean[i] + sign*(unc if unc else 0)
+                    bound_arr[i] = mean_arr[i] + sign*(unc if unc else 0)
                     bound_arr.mask[i] = False
 
         return bound_arr.filled(np.nan)
