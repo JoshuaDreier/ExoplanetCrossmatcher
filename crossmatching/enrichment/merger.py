@@ -237,7 +237,7 @@ class ParamFiller:
         for key, value in override_keys.items():
             if value is not None:
                 resolved[key] = value
-
+        resolved.pop("override_keys")
         return resolved
 
         
