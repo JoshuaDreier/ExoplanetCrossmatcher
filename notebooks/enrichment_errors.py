@@ -55,10 +55,14 @@ e_emc = merger.enrich(
     id_supplier=cme.id_supplier,
     alternate_ids=cme.alternate_ids
 <<<<<<< HEAD
+<<<<<<< HEAD
 )[0]
 =======
 )
 >>>>>>> a8d4a3a (added enrichment analysis notebook)
+=======
+)[0]
+>>>>>>> 1c3f2a9 (anticipating new enrich behavior)
 
 total = len(e_emc)
 
