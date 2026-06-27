@@ -24,6 +24,7 @@ def standardize_spectral_type(spectype: str) -> str:
     * White-dwarf types: strings beginning with ``D`` followed by a
       letter or digit (e.g. ``DA2``, ``DQ``) are not stars on the main
       sequence; they return ``''``.
+    * strip ``~`` from beginning, added by this package in infer_spectral_type if inferred from teff
 
     Parameters
     ----------
@@ -40,6 +41,8 @@ def standardize_spectral_type(spectype: str) -> str:
     s = str(spectype).strip()
     if not s or s in ('null', '--', 'nan'):
         return ''
+    # 0. Strip leading '~' marker potentially added by infer_spectral_type.
+    s = s.lstrip('~')
 
     # 1. White-dwarf types (DA, DB, DQ, …): not main-sequence, return empty.
     #    Note: case-sensitive — lowercase 'd' is a dwarf prefix, not a WD designation.
