@@ -46,14 +46,14 @@ def test_disable_calculations_skips_derivations():
 
     # Act - Normal run (Calculations Enabled)
     merger = ParamFiller([nea])
-    result_enabled = merger.enrich(cat, **DEFAULT_ENRICH_KEYS)
+    result_enabled = merger.enrich(cat, **DEFAULT_ENRICH_KEYS)[0]
     
     # Assert normal behavior
     assert "r_lower_bound" in result_enabled.colnames
     assert not result_enabled["st_mass"].mask[0] # Mass was derived
 
     # Act - Disabled calculations
-    result_disabled = merger.enrich(cat, disable_calculations=True, **DEFAULT_ENRICH_KEYS)
+    result_disabled = merger.enrich(cat, disable_calculations=True, **DEFAULT_ENRICH_KEYS)[0]
     
     # Assert disabled behavior
     assert "r_lower_bound" not in result_disabled.colnames

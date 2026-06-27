@@ -3,7 +3,7 @@
 > [!warning]
 > Enrichment is meant for broad candidate filtering and sanity checks. Many values are merged from heterogeneous catalogues or estimated from approximate relations; do not treat the output as a publication-ready per-planet parameter table without validating the underlying sources.
 
-`ParamFiller.enrich()` returns a copy of an Astropy `Table` with stellar, orbital, and derived planet columns filled in. It is usually run after crossmatching, but it can also enrich a loaded catalogue table directly.
+`ParamFiller.enrich()` returns a tuple `(Table, list[str])` where the first element is a copy of an Astropy `Table` with stellar, orbital, and derived planet columns filled in, and the second element is the list of resolved output columns. It is usually run after crossmatching, but it can also enrich a loaded catalogue table directly.
 
 The current enrichment API is centered on:
 
@@ -33,7 +33,7 @@ hpic_src.load()
 
 filler = ParamFiller([hpic_src, nea_src, simbad_src])
 
-enriched = filler.enrich(
+enriched, resolved_cols = filler.enrich(
     emc_result,
     input_starname_key="star_name",
     id_supplier=cme.id_supplier,
@@ -56,7 +56,7 @@ For a NASA Exoplanet Archive table, use `NEACatalog.ENRICH_KEYS` instead:
 ```python
 from crossmatching import NEACatalog
 
-enriched_nea = filler.enrich(
+enriched_nea, resolved_cols = filler.enrich(
     cm.catalog_table,
     input_starname_key="pl_name",
     id_supplier=cm.id_supplier,
@@ -74,7 +74,7 @@ from crossmatching.enrichment import NeaParamSource
 nea_src = NeaParamSource()
 nea_src.load(from_file="./input/pscomppars.txt", format="ascii")
 
-enriched = ParamFiller([nea_src]).enrich(table, **NEACatalog.ENRICH_KEYS)
+enriched, resolved_cols = ParamFiller([nea_src]).enrich(table, **NEACatalog.ENRICH_KEYS)
 ```
 
 ## Priority Rules
@@ -127,8 +127,8 @@ Source lookup first tries the source's direct key column. If that fails and you 
 `enrich()` has defaults such as `st_rad`, `st_teff`, `pl_insol`, `pl_eqt`, `pl_a`, `period`, and `msini`, but real catalogues use different names. Prefer the built-in mappings:
 
 ```python
-enriched = filler.enrich(result, **EMCCatalog.ENRICH_KEYS)
-enriched = filler.enrich(result, **NEACatalog.ENRICH_KEYS)
+enriched, resolved_cols = filler.enrich(result, **EMCCatalog.ENRICH_KEYS)
+enriched, resolved_cols = filler.enrich(result, **NEACatalog.ENRICH_KEYS)
 ```
 
 Important keys include:
@@ -207,7 +207,7 @@ The detailed formulas, validity notes, provenance strings, and literature refere
 To perform source merging only, disable calculations:
 
 ```python
-merged_only = filler.enrich(
+merged_only, resolved_cols = filler.enrich(
     result,
     disable_calculations=True,
     **EMCCatalog.ENRICH_KEYS,

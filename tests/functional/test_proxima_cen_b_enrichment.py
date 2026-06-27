@@ -68,7 +68,7 @@ def proxima_enriched():
     })
 
     merger = ParamFiller([src])
-    return merger.enrich(table, **DEFAULT_ENRICH_KEYS)
+    return merger.enrich(table, **DEFAULT_ENRICH_KEYS)[0]
 
 
 # ── radius from msini ─────────────────────────────────────────────────────────

@@ -420,7 +420,7 @@ class ParamFiller:
         alternate_ids: Table | None = None,
         disable_calculations: bool = False,
         **override_keys,
-    ) -> Table:
+    ) -> tuple[Table, list[str]]:
         """Return a copy of table with enriched columns added or replaced.
 
         Data priority is:
@@ -491,9 +491,11 @@ class ParamFiller:
 
         Returns
         -------
-        Table
-            Copy of the input table with enriched parameter columns added or replaced. 
+        tuple[Table, list[str]]
+            A tuple containing:
+            1. Copy of the input table with enriched parameter columns added or replaced. 
             Note that no non-masked/invalid (nan) values are ever overwritten. 
+            2. List of the resolved output column names.
 
             The following quantity columns are written using the resolved column
             names from the corresponding ``*_key`` arguments, or the default
@@ -705,7 +707,7 @@ class ParamFiller:
                 resolved_cols,
             )
 
-            return result
+            return result, list(resolved_cols.values())
     
         r_lower_bound = [ParamQty() for _ in range(n)]
         r_upper_bound = [ParamQty() for _ in range(n)]
@@ -771,6 +773,6 @@ class ParamFiller:
                 f"{resolved_cols["planet_radius"]}_upper_bound"
         ])
         self._populate_output_string_columns(result,params_s,resolved_cols,display_values={"st_spectype": displayed_spectypes,},)
-        result[f"normalized_{resolved_cols["star_spectral_type"]}"] = displayed_spectypes
+        result[f"normalized_{resolved_cols['star_spectral_type']}"] = displayed_spectypes
         result["spectral_category"] = spectral_category
-        return result
+        return result, list(resolved_cols.values())

@@ -359,7 +359,7 @@ def _enriched_with_source_errors():
     })
 
     merger = ParamFiller([src])
-    return merger.enrich(table, **DEFAULT_ENRICH_KEYS, disable_calculations=True)
+    return merger.enrich(table, **DEFAULT_ENRICH_KEYS, disable_calculations=True)[0]
 
 
 @pytest.mark.parametrize("col,expected_err", [
@@ -402,7 +402,7 @@ def test_source_with_custom_error_suffix(monkeypatch):
         "r": [np.nan], "a": [np.nan], "p": [np.nan], "msini": [np.nan],
     })
 
-    out = ParamFiller([src]).enrich(table, **DEFAULT_ENRICH_KEYS, disable_calculations=True)
+    out = ParamFiller([src]).enrich(table, **DEFAULT_ENRICH_KEYS, disable_calculations=True)[0]
     assert float(out["st_loggerr1"][0]) == pytest.approx(0.08, rel=1e-6)
     assert float(out["st_loggerr2"][0]) == pytest.approx(0.06, rel=1e-6)
 

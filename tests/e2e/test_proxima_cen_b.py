@@ -3,7 +3,7 @@
 Full pipeline:
   EMCCatalog + EMCIdSupplier → crossmatch TIC 388857263 (Proxima Centauri)
   → HpicParamSource (HPIC stellar params from query row)
-  → ParamFiller.enrich()
+  → ParamFiller.enrich()[0]
   → rocky_mask(use_interval=True) and temperate_mask() both True for Proxima Cen b
 
 Uses only ./input/exo-mercat.csv (cached file, no network). The test is skipped
@@ -63,7 +63,7 @@ def proxima_enriched():
     # ── enrich ──────────────────────────────────────────────────────────────
     hpic_src = HpicParamSource(result)
     hpic_src.load()
-    return ParamFiller([hpic_src]).enrich(result, **EMCCatalog.ENRICH_KEYS)
+    return ParamFiller([hpic_src]).enrich(result, **EMCCatalog.ENRICH_KEYS)[0]
 
 
 # ── crossmatch found the planet ──────────────────────────────────────────────

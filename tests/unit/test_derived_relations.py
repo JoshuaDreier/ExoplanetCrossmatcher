@@ -48,7 +48,7 @@ def test_rad_derived_from_logg_and_mass():
     nea = _nea_source(mass=1.0, logg=4.43797, rad=None)
     cat = Table({"nasa_name": ["Planet X"], "main_id": [""]})
     
-    result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)
+    result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)[0]
     assert "st_rad" in result.colnames
     assert float(result["st_rad"][0]) == pytest.approx(1.0, rel=1e-4)
     assert "logg_derived" in str(result["st_rad_src"][0])
@@ -61,7 +61,7 @@ def test_mass_derived_from_logg_and_rad():
     nea = _nea_source(rad=1.0, logg=4.43797, mass=None)
     cat = Table({"nasa_name": ["Planet X"], "main_id": [""]})
     
-    result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)
+    result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)[0]
     assert "st_mass" in result.colnames
     assert float(result["st_mass"][0]) == pytest.approx(1.0, rel=1e-4)
     assert "logg_derived" in str(result["st_mass_src"][0])
@@ -74,7 +74,7 @@ def test_eqt_derived_from_insol():
     nea = _nea_source(insol=1.0, eqt=None)
     cat = Table({"nasa_name": ["Planet X"], "main_id": [""]})
     
-    result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)
+    result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)[0]
     assert "pl_eqt" in result.colnames
     assert float(result["pl_eqt"][0]) == pytest.approx(254.793, rel=1e-4)
     assert "derived(insol:" in str(result["pl_eqt_src"][0])
@@ -88,7 +88,7 @@ def test_teff_derived_from_spectype():
     nea = _nea_source(teff_masked=True, spectype="G2V")
     cat = Table({"nasa_name": ["Planet X"], "main_id": [""]})
     
-    result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)
+    result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)[0]
     assert "st_teff" in result.colnames
     assert float(result["st_teff"][0]) == pytest.approx(5780.0, rel=1e-4)
     assert float(result["st_tefferr1"][0]) == pytest.approx(80.0, rel=1e-4)
@@ -102,7 +102,7 @@ def test_teff_derived_from_rad_and_lum():
     nea = _nea_source(teff_masked=True, rad=1.0, lum=1.0, spectype="")
     cat = Table({"nasa_name": ["Planet X"], "main_id": [""]})
     
-    result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)
+    result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)[0]
     assert "st_teff" in result.colnames
     assert float(result["st_teff"][0]) == pytest.approx(5778.0, rel=1e-4)
     assert float(result["st_tefferr1"][0]) == pytest.approx(210.7609, rel=1e-4)
@@ -116,7 +116,7 @@ def test_rad_derived_from_lum_and_teff():
     nea = _nea_source(teff=5778.0, rad=None, lum=1.0)
     cat = Table({"nasa_name": ["Planet X"], "main_id": [""]})
     
-    result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)
+    result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)[0]
     assert "st_rad" in result.colnames
     assert float(result["st_rad"][0]) == pytest.approx(1.0, rel=1e-4)
     assert "StephanBoltzmann_derived" in str(result["st_rad_src"][0])
@@ -128,7 +128,7 @@ def test_insol_derived_from_eqt():
     nea = _nea_source(insol=None, eqt=254.793)
     cat = Table({"nasa_name": ["Planet X"], "main_id": [""]})
     
-    result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)
+    result = ParamFiller([nea]).enrich(cat, **DEFAULT_ENRICH_KEYS)[0]
     assert "pl_insol" in result.colnames
     assert float(result["pl_insol"][0]) == pytest.approx(1.0, rel=1e-4)
     assert "derived(eqt:" in str(result["pl_insol_src"][0])
