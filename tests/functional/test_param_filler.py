@@ -470,7 +470,7 @@ def test_rocky_mask_planet_a_confirmed(enriched: Table):
     r = enriched["r"] * u.R_jup.to(u.R_earth)
     rmin = enriched["r_lower_bound"]
     rmax = enriched["r_upper_bound"]
-    mask = rocky_mask(r, rmin, rmax, lower=0.5, upper=1.5)
+    mask = rocky_mask(r, None, None, rmin, rmax, lower=0.5, upper=1.5)
     idx = list(enriched["exo-mercat_name"]).index("Planet A")
     assert mask[idx]
 
@@ -481,8 +481,8 @@ def test_rocky_mask_planet_d_uncertain_rocky(enriched: Table):
     rmin = enriched["r_lower_bound"]
     rmax = enriched["r_upper_bound"]
     idx = list(enriched["exo-mercat_name"]).index("Planet D")
-    assert not rocky_mask(r, rmin, rmax, lower=0.5, upper=1.5)[idx]              # strict
-    assert rocky_mask(r, rmin, rmax, lower=0.5, upper=1.5, use_interval=True)[idx]  # uncertain
+    assert not rocky_mask(r, None, None, rmin, rmax, lower=0.5, upper=1.5)[idx]              # strict
+    assert rocky_mask(r, None, None, rmin, rmax, lower=0.5, upper=1.5, use_interval=True)[idx]  # uncertain
 
 
 def test_planet_e_radius_prediction_2sigma_uncertainty(enriched: Table):

@@ -2,10 +2,18 @@ from __future__ import annotations
 import numpy as np
 
 
+def _to_err(arr, n=1):
+    if arr is None:
+        return np.zeros(n) if n > 1 else 0.0
+    a = np.ma.asarray(arr, dtype=float)
+    bad = np.ma.getmaskarray(a) | ~np.isfinite(a.data)
+    return np.where(bad, 0.0, np.abs(a.data))
+
+
 def temperate_mask(
     pl_insol,
-    pl_insol_err1,
-    pl_insol_err2,
+    pl_insol_max,
+    pl_insol_min,
     lower: float,
     upper: float,
     use_interval: bool = False,
@@ -31,22 +39,17 @@ def temperate_mask(
     valid = ~np.ma.getmaskarray(flux)
 
     if not use_interval:
-        return valid & (flux.data >= lower) & (flux.data <= upper)
-
-    def _to_err(arr):
-        if arr is None:
-            return np.zeros(len(flux))
-        a = np.ma.asarray(arr, dtype=float)
-        bad = np.ma.getmaskarray(a) | ~np.isfinite(a.data)
-        return np.where(bad, 0.0, np.abs(a.data))
-
-    err1 = _to_err(pl_insol_err1)
-    err2 = _to_err(pl_insol_err2)
+        return valid & (flux.data >= lower) & (flux.data <= upper) 
+    
+    err1 = _to_err(pl_insol_max, len(flux))
+    err2 = _to_err(pl_insol_min, len(flux))
     return valid & (flux.data - err2 <= upper) & (flux.data + err1 >= lower)
 
 
 def rocky_mask(
     r,
+    r_min,
+    r_max,
     r_lower_bound,
     r_upper_bound,
     lower: float = 0.5,
@@ -59,6 +62,10 @@ def rocky_mask(
     ----------
     r : array-like or MaskedColumn
         Directly measured planet radii in R_Earth (caller converts from R_Jup via R_JUP_TO_EARTH).
+    r_max : array-like, MaskedColumn, or None
+        Upper 1-sigma uncertainty (positive magnitude). Masked/NaN → treated as 0.
+    r_min :  array-like, MaskedColumn, or None
+        Lower 1-sigma uncertainty (positive magnitude). Masked/NaN → treated as 0.
     r_lower_bound : array-like, MaskedColumn, or None
         Lower bound on estimated radius from msini. Masked/NaN → no bound.
     r_upper_bound : array-like, MaskedColumn, or None
@@ -78,16 +85,22 @@ def rocky_mask(
     if not use_interval:
         return known_rocky
 
-    def _to_bound(arr):
-        if arr is None:
+    def _to_bound(bound_arr, mean, uncertainty, sign):
+        if bound_arr is None:
             return np.full(len(r), np.nan)
-        a = np.ma.asarray(arr, dtype=float)
-        bad = np.ma.getmaskarray(a) | ~np.isfinite(a.data)
-        return np.where(bad, np.nan, a.data)
 
-    rmin = _to_bound(r_lower_bound)
-    rmax = _to_bound(r_upper_bound)
-    has_bounds = ~valid & np.isfinite(rmin) & np.isfinite(rmax)
-    uncertain_rocky = has_bounds & (rmin <= upper) & (rmax >= lower)
+        bound_arr = np.ma.asanyarray(bound_arr)        
+        for i, b in enumerate(bound_arr):
+            if not b or bound_arr.mask[i]:
+                if mean[i]: 
+                    unc = uncertainty[i] if uncertainty else 0
+                    bound_arr[i] = mean[i] + sign*(unc if unc else 0)
+                    bound_arr.mask[i] = False
+
+        return bound_arr.filled(np.nan)
+
+    rmin = _to_bound(r_lower_bound, r, r_min, -1)
+    rmax = _to_bound(r_upper_bound, r, r_max, 1)
+    uncertain_rocky = (rmin <= upper) & (rmax >= lower)
 
     return known_rocky | uncertain_rocky

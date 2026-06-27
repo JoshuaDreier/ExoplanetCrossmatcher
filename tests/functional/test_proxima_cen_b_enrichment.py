@@ -113,9 +113,9 @@ def test_pl_insol_approx_value(proxima_enriched):
 
 def test_rocky_mask_use_interval(proxima_enriched):
     out = proxima_enriched
-    assert not rocky_mask(out["r"] * u.R_jup.to(u.R_earth), out["r_lower_bound"], out["r_upper_bound"],
+    assert not rocky_mask(out["r"] * u.R_jup.to(u.R_earth), None, None, out["r_lower_bound"], out["r_upper_bound"],
                           lower=_ROCKY_LOWER, upper=_ROCKY_UPPER)[0]
-    assert rocky_mask(out["r"] * u.R_jup.to(u.R_earth), out["r_lower_bound"], out["r_upper_bound"],
+    assert rocky_mask(out["r"] * u.R_jup.to(u.R_earth), None, None, out["r_lower_bound"], out["r_upper_bound"],
                       lower=_ROCKY_LOWER, upper=_ROCKY_UPPER, use_interval=True)[0]
 
 
@@ -132,7 +132,7 @@ def test_proxima_cen_b_temperate_uncertain_rocky(proxima_enriched):
         lower=_HZ_LOWER, upper=_HZ_UPPER,
     )[0]
     is_uncertain_rocky = rocky_mask(
-        out["r"] * u.R_jup.to(u.R_earth), out["r_lower_bound"], out["r_upper_bound"],
+        out["r"] * u.R_jup.to(u.R_earth), None, None, out["r_lower_bound"], out["r_upper_bound"],
         lower=_ROCKY_LOWER, upper=_ROCKY_UPPER, use_interval=True,
     )[0]
     assert is_temperate and is_uncertain_rocky

@@ -166,17 +166,17 @@ def _rb(vals, mask=None):
 
 def test_rocky_mask_in_range():
     r = _r([1.0])
-    assert rocky_mask(r, None, None, lower=0.5, upper=1.5)[0]
+    assert rocky_mask(r, None, None, None, None, lower=0.5, upper=1.5)[0]
 
 
 def test_rocky_mask_out_of_range():
     r = _r([2.0])
-    assert not rocky_mask(r, None, None, lower=0.5, upper=1.5)[0]
+    assert not rocky_mask(r, None, None, None, None, lower=0.5, upper=1.5)[0]
 
 
 def test_rocky_mask_excludes_masked_r():
     r = _r([1.0], mask=[True])
-    assert not rocky_mask(r, None, None, lower=0.5, upper=1.5)[0]
+    assert not rocky_mask(r, None, None, None, None, lower=0.5, upper=1.5)[0]
 
 
 def test_rocky_mask_interval_catches_uncertain():
@@ -184,7 +184,7 @@ def test_rocky_mask_interval_catches_uncertain():
     r    = _r([0.0], mask=[True])
     rmin = _rb([1.1])
     rmax = _rb([1.4])
-    assert rocky_mask(r, rmin, rmax, lower=0.5, upper=1.5, use_interval=True)[0]
+    assert rocky_mask(r, None, None, rmin, rmax, lower=0.5, upper=1.5, use_interval=True)[0]
 
 
 def test_rocky_mask_interval_no_overlap():
@@ -192,13 +192,13 @@ def test_rocky_mask_interval_no_overlap():
     r    = _r([0.0], mask=[True])
     rmin = _rb([2.0])
     rmax = _rb([3.0])
-    assert not rocky_mask(r, rmin, rmax, lower=0.5, upper=1.5, use_interval=True)[0]
+    assert not rocky_mask(r, None, None, rmin, rmax, lower=0.5, upper=1.5, use_interval=True)[0]
 
 
 def test_rocky_mask_no_bounds_falls_back():
     # r_earth masked, no bounds → use_interval=True still False
     r = _r([0.0], mask=[True])
-    assert not rocky_mask(r, None, None, lower=0.5, upper=1.5, use_interval=True)[0]
+    assert not rocky_mask(r, None, None, None, None, lower=0.5, upper=1.5, use_interval=True)[0]
 
 
 def test_rocky_mask_interval_false_ignores_bounds():
@@ -206,13 +206,13 @@ def test_rocky_mask_interval_false_ignores_bounds():
     r    = _r([0.0], mask=[True])
     rmin = _rb([1.0])
     rmax = _rb([1.3])
-    assert not rocky_mask(r, rmin, rmax, lower=0.5, upper=1.5, use_interval=False)[0]
+    assert not rocky_mask(r, None, None, rmin, rmax, lower=0.5, upper=1.5, use_interval=False)[0]
 
 
 def test_rocky_mask_known_rocky_still_included_in_interval_mode():
     # use_interval=True should also include confirmed rocky planets
     r = _r([1.0])
-    assert rocky_mask(r, None, None, lower=0.5, upper=1.5, use_interval=True)[0]
+    assert rocky_mask(r, None, None, None, None, lower=0.5, upper=1.5, use_interval=True)[0]
 
 
 def test_temperate_mask_none_err_in_interval_mode():
@@ -220,6 +220,27 @@ def test_temperate_mask_none_err_in_interval_mode():
     flux = _flux([1.0, 2.0])
     result = temperate_mask(flux, None, None, lower=0.25, upper=1.77, use_interval=True)
     assert list(result) == [True, False]
+
+
+def test_rocky_mask_interval_with_radius_uncertainty_overlap():
+    # Valid r outside range, but with uncertainties it overlaps [0.5, 1.5]
+    r     = _r([1.6])
+    r_min = _rb([0.2])  # 1.6 - 0.2 = 1.4 <= 1.5 (overlap)
+    r_max = _rb([0.2])  # 1.6 + 0.2 = 1.8 >= 0.5 (overlap)
+    r_lb  = _rb([0.0], mask=[True])
+    r_ub  = _rb([0.0], mask=[True])
+    assert rocky_mask(r, r_min, r_max, r_lb, r_ub, lower=0.5, upper=1.5, use_interval=True)[0]
+
+
+def test_rocky_mask_interval_with_radius_uncertainty_no_overlap():
+    # Valid r outside range, uncertainties too small to overlap [0.5, 1.5]
+    r     = _r([1.6])
+    r_min = _rb([0.05])  # 1.6 - 0.05 = 1.55 > 1.5 (no overlap)
+    r_max = _rb([0.05])  # 1.6 + 0.05 = 1.65 >= 0.5
+    r_lb  = _rb([0.0], mask=[True])
+    r_ub  = _rb([0.0], mask=[True])
+    assert not rocky_mask(r, r_min, r_max, r_lb, r_ub, lower=0.5, upper=1.5, use_interval=True)[0]
+
 
 
 # --- _mann_teff_radius ---

@@ -110,7 +110,7 @@ def test_proxima_cen_b_is_temperate_uncertain_rocky(proxima_enriched):
         lower=_HZ_LOWER, upper=_HZ_UPPER,
     )[idx]
     is_uncertain_rocky = rocky_mask(
-        out["r"] * u.R_jup.to(u.R_earth), out["r_lower_bound"], out["r_upper_bound"],
+        out["r"] * u.R_jup.to(u.R_earth), None, None, out["r_lower_bound"], out["r_upper_bound"],
         lower=_ROCKY_LOWER, upper=_ROCKY_UPPER, use_interval=True,
     )[idx]
 
