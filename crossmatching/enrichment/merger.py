@@ -558,9 +558,9 @@ class ParamFiller:
             Defualt Column Name                Processing
             ====================== ================================================================
             ``pl_rad_lower_bound`` Minimum estimated planet radius from true mass or ``msini``
-                                   when direct radius is missing.
+                                   when direct radius is missing in R_jup.
             ``pl_rad_upper_bound`` Maximum estimated planet radius from true mass or ``msini``
-                                   when direct radius is missing.
+                                   when direct radius is missing in R_jup.
             ``spectral_category``  Spectral category computed from the displayed stellar spectral
                                    type using ``classify_spectral_type``.
             ====================== ==============================================================

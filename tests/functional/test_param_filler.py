@@ -25,9 +25,6 @@ from crossmatching.enrichment.param_sources.nea import NeaParamSource
 from crossmatching.enrichment.param_sources.simbad import SimbadParamSource
 from crossmatching import EMCCatalog
 
-_MSINI_D = 1.27 / u.M_jup.to(u.M_earth)  # 1.27 M_Earth expressed in M_Jup
-
-
 # ── toy data ──────────────────────────────────────────────────────────────────
 
 def _hpic_table():
@@ -93,13 +90,13 @@ def _catalog_table():
         "exo-mercat_name": ["Planet A", "Planet B", "Planet C", "Planet D", "Planet E"],
         "nasa_name":       ["Planet A", "Planet B", "unknown",  "", ""],
         "main_id":         ["main_A",   "main_B",   "simbad_host_C", "", ""],
-        "r":               [0.1,        0.2,        0.08,       0.0,        0],    # Jupiter radii; D absent
+        "r":               [0.1,        0.2,        0.08,       np.nan,     np.nan], # R_jup
         "a":               [1.0,        0.0,        0.0,        0.0485,     0], # AU
         "p":               [365.0,      30.0,       0.0,        11.186,     0], # days
-        "msini":           [np.nan,     np.nan,     np.nan,     _MSINI_D,   np.nan],  # M_Jup; D only
+        "msini":           [np.nan,     np.nan,     np.nan,     1.27*u.M_earth.to(u.M_jup), np.nan],  # M_Jup
         "mass":            [np.nan,     np.nan,     np.nan,     np.nan,     1.0*u.M_earth.to(u.Mjup)],
         "masserr1" :       [np.nan,     np.nan,     np.nan,     np.nan,     0.1*u.M_earth.to(u.Mjup)],
-        "masserr2":    [np.nan,     np.nan,     np.nan,     np.nan,     0.2*u.M_earth.to(u.Mjup)] 
+        "masserr2":        [np.nan,     np.nan,     np.nan,     np.nan,     0.2*u.M_earth.to(u.Mjup)] 
     })
 
 
@@ -440,9 +437,9 @@ def test_temperate_mask_interval_widens_selection(enriched: Table):
 # ── Planet D: msini only, no direct radius ────────────────────────────────────
 
 def test_planet_d_no_direct_radius(enriched: Table):
-    # Planet D has r=0 in catalog → treated as absent; bounds are populated instead
+    # Planet D has no direct radius → r is masked; bounds are populated instead
     row = _row(enriched, "Planet D")
-    assert float(row["r"]) == 0.0
+    assert np.ma.is_masked(row["r"])
     assert not np.ma.is_masked(row["r_lower_bound"])
 
 
@@ -450,9 +447,9 @@ def test_planet_d_r_lower_bound_rocky(enriched: Table):
     # msini=1.27 M_Earth → r_min = mass_radius_chen_kipping(1.27) in rocky range
     row = _row(enriched, "Planet D")
     assert not np.ma.is_masked(row["r_lower_bound"])
-    expected_min = mass_radius_chen_kipping(1.27)
+    expected_min = mass_radius_chen_kipping(1.27)*u.R_earth.to(u.R_jup)
     assert float(row["r_lower_bound"]) == pytest.approx(expected_min, rel=1e-4)
-    assert 0.5 < float(row["r_lower_bound"]) < 1.5
+    assert 0.5 < float(row["r_lower_bound"])*u.R_jup.to(u.R_earth) < 1.5
 
 
 def test_planet_abc_r_lower_bound_masked(enriched: Table):
@@ -468,9 +465,11 @@ def test_planet_abc_r_lower_bound_masked(enriched: Table):
 def test_rocky_mask_planet_a_confirmed(enriched: Table):
     # Planet A: r=0.1 R_Jup ≈ 1.12 R_Earth → confirmed rocky
     r = enriched["r"] * u.R_jup.to(u.R_earth)
-    rmin = enriched["r_lower_bound"]
-    rmax = enriched["r_upper_bound"]
-    mask = rocky_mask(r, None, None, rmin, rmax, lower=0.5, upper=1.5)
+    r_err1 = enriched["rerr1"] * u.R_jup.to(u.R_earth)
+    r_err2 = enriched["rerr2"] * u.R_jup.to(u.R_earth)
+    r_lower_bound = enriched["r_lower_bound"] * u.R_jup.to(u.R_earth)
+    r_upper_bound = enriched["r_upper_bound"] * u.R_jup.to(u.R_earth)
+    mask = rocky_mask(r, r_err2, r_err1, r_lower_bound, r_upper_bound, lower=0.5, upper=1.5)
     idx = list(enriched["exo-mercat_name"]).index("Planet A")
     assert mask[idx]
 
@@ -478,14 +477,16 @@ def test_rocky_mask_planet_a_confirmed(enriched: Table):
 def test_rocky_mask_planet_d_uncertain_rocky(enriched: Table):
     # Planet D: no direct radius, but msini estimates put it in rocky range
     r = enriched["r"] * u.R_jup.to(u.R_earth)
-    rmin = enriched["r_lower_bound"]
-    rmax = enriched["r_upper_bound"]
+    r_err1 = enriched["rerr1"] * u.R_jup.to(u.R_earth)
+    r_err2 = enriched["rerr2"] * u.R_jup.to(u.R_earth)
+    r_lower_bound = enriched["r_lower_bound"] * u.R_jup.to(u.R_earth)
+    r_upper_bound = enriched["r_upper_bound"] * u.R_jup.to(u.R_earth)
     idx = list(enriched["exo-mercat_name"]).index("Planet D")
-    assert not rocky_mask(r, None, None, rmin, rmax, lower=0.5, upper=1.5)[idx]              # strict
-    assert rocky_mask(r, None, None, rmin, rmax, lower=0.5, upper=1.5, use_interval=True)[idx]  # uncertain
-
+    print(r[idx], r_err1[idx], r_err2[idx], r_lower_bound[idx], r_upper_bound[idx])
+    assert not rocky_mask(r, r_err2, r_err1, r_lower_bound, r_upper_bound, lower=0.5, upper=1.5)[idx]              
+    assert rocky_mask(r, r_err2, r_err1, r_lower_bound, r_upper_bound, lower=0.5, upper=1.5, use_interval=True)[idx]  
 
 def test_planet_e_radius_prediction_2sigma_uncertainty(enriched: Table):
     row = _row(enriched, "Planet E")
-    assert row["r_lower_bound"] == pytest.approx(mass_radius_chen_kipping(0.6))
-    assert row["r_upper_bound"] == pytest.approx(mass_radius_chen_kipping(1.2))
+    assert row["r_lower_bound"] == pytest.approx(mass_radius_chen_kipping(0.6)*u.R_earth.to(u.R_jup))
+    assert row["r_upper_bound"] == pytest.approx(mass_radius_chen_kipping(1.2)*u.R_earth.to(u.R_jup))

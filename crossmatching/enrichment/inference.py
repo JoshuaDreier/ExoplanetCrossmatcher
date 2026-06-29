@@ -402,6 +402,7 @@ def infer_msini_radius_bounds(
     msini_sin_min: float = 0.3,
 ) -> tuple[ParamQty, ParamQty]:
     r"""Derive lower and upper radius bounds from planet mass or minimum mass.
+    (in R_jup)
 
     If the planet radius is already provided, no bounds are inferred.
 
@@ -468,8 +469,8 @@ def infer_msini_radius_bounds(
         mass_lower_earth = mass_earth - 2.0 * (err_lower_earth if err_lower_earth else 0)
         mass_upper_earth = mass_earth + 2.0 * (err_upper_earth if err_upper_earth else 0)
 
-        lower_val = mass_radius_chen_kipping(mass_lower_earth)
-        upper_val = mass_radius_chen_kipping(mass_upper_earth)
+        lower_val = mass_radius_chen_kipping(mass_lower_earth)*u.R_earth.to(u.R_jup)
+        upper_val = mass_radius_chen_kipping(mass_upper_earth)*u.R_earth.to(u.R_jup)
 
         lower = ParamQty(
             val=lower_val,
@@ -493,8 +494,8 @@ def infer_msini_radius_bounds(
 
     msini_earth = msini.val * u.M_jup.to(u.M_earth)
 
-    lower_val = mass_radius_chen_kipping(msini_earth)
-    upper_val = mass_radius_chen_kipping(msini_earth / msini_sin_min)
+    lower_val = mass_radius_chen_kipping(msini_earth)*u.R_earth.to(u.R_jup)
+    upper_val = mass_radius_chen_kipping(msini_earth / msini_sin_min)*u.R_earth.to(u.R_jup)
 
     lower = ParamQty(
         val=lower_val,
