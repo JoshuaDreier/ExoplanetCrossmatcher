@@ -5,7 +5,7 @@
 ```
 crossmatching/
   crossmatcher.py       # Crossmatcher class + allowed_angular_separation()
-  enrichment.py         # StellarParamMerger + mask helpers
+  enrichment.py         # ParamFiller + mask helpers
   config.py             # crossmatching.cfg defaults
   __init__.py           # Public re-exports
   catalogs/
@@ -19,11 +19,11 @@ crossmatching/
     emc.py              # EMCIdSupplier — reads aliases from EMC file
   param_sources/
     base.py             # StellarParamSource — abstract interface
-    hpic.py             # HpicStellarParamSource — HPIC crossmatch output
-    nea.py              # NeaStellarParamSource — NEA pscomppars
-    simbad.py           # SimbadStellarParamSource — SIMBAD mesFe_h tables
-    epic.py             # EpicStellarParamSource — K2 EPIC catalog
-    toi.py              # ToiStellarParamSource — TESS TOI catalog
+    hpic.py             # HpicParamSource — HPIC crossmatch output
+    nea.py              # NeaParamSource — NEA pscomppars
+    simbad.py           # SimbadParamSource — SIMBAD mesFe_h tables
+    epic.py             # EpicParamSource — K2 EPIC catalog
+    toi.py              # ToiParamSource — TESS TOI catalog
 ```
 
 

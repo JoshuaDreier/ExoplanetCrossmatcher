@@ -39,7 +39,7 @@ milliseconds and have no external dependencies.
 
 ### Functional tests
 
-Test a component (e.g. `StellarParamMerger`) with real table data loaded from
+Test a component (e.g. `ParamFiller`) with real table data loaded from
 `tests/data/`.  Faster than e2e because they don't run the full crossmatch
 pipeline.
 
