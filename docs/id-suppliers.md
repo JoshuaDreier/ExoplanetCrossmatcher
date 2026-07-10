@@ -26,7 +26,6 @@ variant forms:
 | Strip `*` / `**` object-type prefix | `'* alf Cen'`        | `'alf Cen'`     | SIMBAD prepends object-type codes; NEA doesn't |
 | Strip `'s` possessive suffix        | `"Barnard's"`        | `'Barnard'`     | NEA uses `'Barnard b'`, not `"Barnard's b"`    |
 | Strip `NAME ` prefix                | `'NAME Proxima Cen'` | `'Proxima Cen'` | SIMBAD `NAME` tag is catalog-internal          |
-| Drop trailing component letter      | `'Kepler-1229 A'`    | `'Kepler-1229'` | Some catalogs append `A`/`B`/`C`/`S`/`N`       |
 
 These variants bridge the naming gap between SIMBAD's internal identifiers and the host-name column in the planet catalog.
 

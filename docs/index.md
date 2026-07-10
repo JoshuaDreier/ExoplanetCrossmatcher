@@ -13,7 +13,6 @@ be enriched with stellar and derived planetary parameters from multiple sources.
 
 | Page | Contents |
 |------|----------|
-| [Getting Started](getting-started.md) | Installation, caching data files, first crossmatch in 10 lines |
 | [Architecture](architecture.md) | Package layout, crossmatch data flow, enrichment pipeline diagram |
 | [Crossmatching](crossmatching.md) | ID matching, coordinate matching, combined strategy, output columns |
 | [Enrichment](enrichment.md) | `ParamFiller`, parameter-source priority chain, derived columns |

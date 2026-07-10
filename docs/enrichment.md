@@ -117,7 +117,7 @@ If `from_file` is omitted, the source downloads from its TAP service. During dev
 | `NeaParamSource`    | `nasa_name`                | stellar radius, mass, Teff, logg, metallicity, luminosity, magnitudes, distance, planet flux, equilibrium temperature |
 | `EpicParamSource`   | `epic_name`                | K2/EPIC stellar and planet parameters                                                                                 |
 | `ToiParamSource`    | `toi_name`                 | TOI Teff, radius, distance, flux, logg, equilibrium temperature                                                       |
-| `EuParamSource`     | `name`                     | exoplanet.eu stellar parameters (no errors) and equilibrium temperature                                               |
+| `EuParamSource`     | `eu_name`                  | exoplanet.eu stellar parameters (no errors) and equilibrium temperature                                               |
 | `SimbadParamSource` | `main_id`                  | spectral type, Teff, logg, metallicity, V/K magnitudes, distance (from parallax)                                      |
 
 Source lookup first tries the source's direct key column. If that fails and you passed `input_starname_key`, `id_supplier`, and `alternate_ids`, it can try alternate identifiers from the ID supplier.

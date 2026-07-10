@@ -89,7 +89,7 @@ from crossmatching.catalogs.base import CatalogBase
 class MyTAPCatalog(CatalogBase):
     ra_key = "ra"
     dec_key = "dec"
-    hostname_key = "host"       
+    host_key = "host"           
     planet_uid = "planet_name" 
     pm_key = None               
     pmerr_key = None            
@@ -98,8 +98,8 @@ class MyTAPCatalog(CatalogBase):
         service = pyvo.dal.TAPService("http://my-tap-service.example.org/tap")
         return service.search("SELECT * FROM my_schema.my_planets").to_table()
 
-    def preprocess(self, table: Table) -> Table:g, like 
-	    # optional preprocessing, like deleting certain rows
+    def preprocess(self, table: Table) -> Table:
+        # optional preprocessing, like deleting certain rows
         return table    
         
 ```
