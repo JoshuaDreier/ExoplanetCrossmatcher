@@ -1,3 +1,8 @@
+[![astropy](https://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat)](https://www.astropy.org/)
+[![Python](https://img.shields.io/badge/python-3.14-blue?style=flat&logo=python)](https://www.python.org/)
+[![pytest](https://img.shields.io/badge/tested%20with-pytest-0A9EDC?style=flat&logo=pytest)](https://docs.pytest.org/)
+[![Jupyter](https://img.shields.io/badge/best%20used%20with-Jupyter-F37626?style=flat&logo=jupyter)](https://jupyter.org/)
+
 # Exoplanet Crossmatcher
 
 A Python library that identifies exoplanet host stars by matching an input stellar survey against exoplanet catalogs using two complementary strategies:
