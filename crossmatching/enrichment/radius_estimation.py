@@ -8,7 +8,7 @@ _MANN_MKS_COEFFS  = (1.9515, -0.3520, 0.01680)              # erratum ApJ 819 87
 _TORRES_COEFFS    = (2.4427, 0.6679, 0.1771, 0.705, -0.21415, 0.02306, 0.04173)
 
 
-def _mann_teff_radius(teff: float, met: float = None) -> float:
+def mann_teff_radius(teff: float, met: float = None) -> float:
     """Mann et al. 2015 Teff polynomial for K7–M7 dwarfs (valid ~2400–4200 K).
 
     Scatter: 13.4% (Teff only) or 9.3% (with [Fe/H]). Erratum: ApJ 819 87.
@@ -23,7 +23,7 @@ def _mann_teff_radius(teff: float, met: float = None) -> float:
     return max(r, 0.05)
 
 
-def _mann_mks_radius(mks: float, met: float = None) -> float:
+def mann_mks_radius(mks: float, met: float = None) -> float:
     """Mann et al. 2015 M_Ks polynomial for K7–M7 dwarfs (valid M_Ks ≈ 4–10.5).
 
     Scatter: 2.89% (no [Fe/H]) or 2.70% (with [Fe/H]). Erratum: ApJ 819 87.
@@ -35,7 +35,7 @@ def _mann_mks_radius(mks: float, met: float = None) -> float:
     return max(r, 0.05)
 
 
-def _torres_radius(teff: float, logg: float, met: float = None) -> float:
+def torres_radius(teff: float, logg: float, met: float = None) -> float:
     """Torres et al. 2010 (A&A Rev 18 67) spectroscopic calibration for FGK stars.
 
     Valid range: ~4700–8500 K (F0–K5). Scatter: ~3%. Requires log g.

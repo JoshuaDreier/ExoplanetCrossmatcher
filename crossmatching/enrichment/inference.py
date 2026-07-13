@@ -4,9 +4,9 @@ import numpy as np
 import astropy.units as u
 
 from crossmatching.enrichment.radius_estimation import (
-    _mann_mks_radius,
-    _mann_teff_radius,
-    _torres_radius,
+    mann_mks_radius,
+    mann_teff_radius,
+    torres_radius,
     _zams_exponent,
     ms_radius_from_teff,
     mass_radius_chen_kipping,
@@ -246,19 +246,19 @@ def infer_star_radius(
         if kmag_val is not None and dist_val is not None and dist_val > 0 and teff_val < 4200:
             mks = kmag_val - 5.0 * np.log10(dist_val / 10.0)
             if 4.0 <= mks <= 10.5:
-                r = _mann_mks_radius(mks, met_val)
+                r = mann_mks_radius(mks, met_val)
                 r_tag = f"mann_mks(kmag:{kmag.src})"
                 err1 = err2 = 0.029 * r
 
         # 2. Torres 2010 — best for FGK with log g (~3% scatter)
         if r == 0.0 and logg_val is not None and 3900 < teff_val < 8500:
-            r = _torres_radius(teff_val, logg_val, met_val)
+            r = torres_radius(teff_val, logg_val, met_val)
             r_tag = f"torres(teff:{teff.src} logg:{logg.src})"
             err1 = err2 = 0.030 * r
 
         # 3. Mann 2015 Teff polynomial — better than power law for M dwarfs
         if r == 0.0 and teff_val < 4000:
-            r = _mann_teff_radius(teff_val, met_val)
+            r = mann_teff_radius(teff_val, met_val)
             r_tag = f"mann_teff(teff:{teff.src})"
             frac = 0.093 if (met_val is not None and np.isfinite(met_val)) else 0.134
             err1 = err2 = frac * r

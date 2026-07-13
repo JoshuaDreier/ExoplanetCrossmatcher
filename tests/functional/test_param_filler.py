@@ -15,7 +15,7 @@ from astropy.table import MaskedColumn, Table
 
 from crossmatching.enrichment import (
     ParamFiller,
-    _mann_teff_radius,
+    mann_teff_radius,
     mass_radius_chen_kipping,
     rocky_mask,
     temperate_mask,
@@ -292,7 +292,7 @@ def test_planet_c_simbad_teff(enriched: Table):
 def test_planet_c_rad_from_ms_radius(enriched: Table):
     # mann_teff takes priority over ZAMS for teff < 4000K
     row = _row(enriched, "Planet C")
-    assert float(row["st_rad"]) == pytest.approx(_mann_teff_radius(3400.0))
+    assert float(row["st_rad"]) == pytest.approx(mann_teff_radius(3400.0))
 
 
 def test_planet_c_pl_insol_masked(enriched: Table):
@@ -396,7 +396,7 @@ def test_planet_c_rad_err_from_mann_teff_scatter(enriched: Table):
     row = _row(enriched, "Planet C")
     assert not np.ma.is_masked(row["st_raderr1"])
     assert not np.ma.is_masked(row["st_raderr2"])
-    expected = 0.134 * _mann_teff_radius(3400.0)
+    expected = 0.134 * mann_teff_radius(3400.0)
     assert float(row["st_raderr1"]) == pytest.approx(expected, rel=1e-5)
     assert float(row["st_raderr2"]) == pytest.approx(expected, rel=1e-5)
 

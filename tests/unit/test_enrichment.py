@@ -10,9 +10,9 @@ from crossmatching.enrichment import (
     spectype_display,
     temperate_mask,
     teff_to_spectype,
-    _mann_teff_radius,
-    _mann_mks_radius,
-    _torres_radius,
+    mann_teff_radius,
+    mann_mks_radius,
+    torres_radius,
 )
 
 
@@ -248,73 +248,73 @@ def test_rocky_mask_interval_with_radius_uncertainty_no_overlap():
 def test_mann_teff_solar_type_star():
     # Teff = 3500 K (x=1) → polynomial collapses to sum of coefficients
     # 10.5440 - 33.7546 + 35.1909 - 11.5928 ≈ 0.387 R_sun (M2 dwarf)
-    r = _mann_teff_radius(3500.0)
+    r = mann_teff_radius(3500.0)
     assert 0.35 < r < 0.45
 
 def test_mann_teff_late_m_dwarf():
     # Teff = 3000 K — late M dwarf, R ≈ 0.15–0.20 R_sun
-    r = _mann_teff_radius(3000.0)
+    r = mann_teff_radius(3000.0)
     assert 0.10 < r < 0.25
 
 def test_mann_teff_zero_guard():
-    assert _mann_teff_radius(0.0) == 0.0  # invalid input → 0
+    assert mann_teff_radius(0.0) == 0.0  # invalid input → 0
 
 def test_mann_teff_metallicity_increases_radius():
-    r_solar = _mann_teff_radius(3500.0, met=0.0)
-    r_supersolar = _mann_teff_radius(3500.0, met=0.3)
+    r_solar = mann_teff_radius(3500.0, met=0.0)
+    r_supersolar = mann_teff_radius(3500.0, met=0.3)
     assert r_supersolar > r_solar
 
 def test_mann_teff_none_met_equals_solar():
-    assert _mann_teff_radius(3500.0, met=None) == pytest.approx(_mann_teff_radius(3500.0, met=0.0))
+    assert mann_teff_radius(3500.0, met=None) == pytest.approx(mann_teff_radius(3500.0, met=0.0))
 
 
 # --- _mann_mks_radius ---
 
 def test_mann_mks_early_m_dwarf():
     # M_Ks ≈ 5.0 (early M dwarf) → R ≈ 0.45–0.65 R_sun
-    r = _mann_mks_radius(5.0)
+    r = mann_mks_radius(5.0)
     assert 0.40 < r < 0.70
 
 def test_mann_mks_mid_m_dwarf():
     # M_Ks ≈ 8.5 (mid M dwarf) → R ≈ 0.15–0.30 R_sun
-    r = _mann_mks_radius(8.5)
+    r = mann_mks_radius(8.5)
     assert 0.10 < r < 0.35
 
 def test_mann_mks_zero_guard():
     # Extremely bright M_Ks = 0 → polynomial may give implausible value, clamped to 0.05
-    r = _mann_mks_radius(0.0)
+    r = mann_mks_radius(0.0)
     assert r >= 0.05
 
 def test_mann_mks_none_met_equals_solar():
-    assert _mann_mks_radius(6.0, met=None) == pytest.approx(_mann_mks_radius(6.0, met=0.0))
+    assert mann_mks_radius(6.0, met=None) == pytest.approx(mann_mks_radius(6.0, met=0.0))
 
 
 # --- _torres_radius ---
 
 def test_torres_solar_star():
     # Sun: Teff=5778, logg=4.438, [Fe/H]=0 → R ≈ 1.0 R_sun
-    r = _torres_radius(5778.0, 4.438, 0.0)
+    r = torres_radius(5778.0, 4.438, 0.0)
     assert 0.95 < r < 1.05
 
 def test_torres_f_star():
     # F5V dwarf: Teff=6500, logg=4.2, [Fe/H]=0 → R ≈ 1.3–1.8 R_sun
-    r = _torres_radius(6500.0, 4.2, 0.0)
+    r = torres_radius(6500.0, 4.2, 0.0)
     assert 1.2 < r < 1.9
 
 def test_torres_k_dwarf():
     # K5 dwarf: Teff=4700, logg=4.7, [Fe/H]=0 → R ≈ 0.6–0.9 R_sun
-    r = _torres_radius(4700.0, 4.7, 0.0)
+    r = torres_radius(4700.0, 4.7, 0.0)
     assert 0.55 < r < 0.95
 
 def test_torres_none_met_treated_as_solar():
-    assert _torres_radius(5778.0, 4.438, None) == pytest.approx(
-        _torres_radius(5778.0, 4.438, 0.0), rel=1e-6
+    assert torres_radius(5778.0, 4.438, None) == pytest.approx(
+        torres_radius(5778.0, 4.438, 0.0), rel=1e-6
     )
 
 def test_torres_metallicity_effect():
-    r_solar    = _torres_radius(5778.0, 4.438, 0.0)
-    r_metpoor  = _torres_radius(5778.0, 4.438, -0.5)
-    r_metrich  = _torres_radius(5778.0, 4.438,  0.5)
+    r_solar    = torres_radius(5778.0, 4.438, 0.0)
+    r_metpoor  = torres_radius(5778.0, 4.438, -0.5)
+    r_metrich  = torres_radius(5778.0, 4.438,  0.5)
     # Metal-rich stars are slightly larger; metal-poor slightly smaller
     assert r_metrich > r_solar > r_metpoor
 
