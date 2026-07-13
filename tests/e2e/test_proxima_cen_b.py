@@ -116,7 +116,7 @@ def test_proxima_cen_b_no_direct_radius(proxima_enriched):
 
 def test_proxima_cen_b_r_lower_bound_is_rocky(proxima_enriched):
     idx = _proxima_b_idx(proxima_enriched)
-    rmin = float(proxima_enriched["r_lower_bound"][idx])
+    rmin = float(proxima_enriched["r_lower_bound"][idx])*u.R_jup.to(u.R_earth)
     assert not np.isnan(rmin)
     assert _ROCKY_LOWER < rmin < _ROCKY_UPPER, f"r_lower_bound={rmin:.3f} outside rocky range"
 

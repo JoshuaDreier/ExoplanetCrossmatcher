@@ -201,12 +201,12 @@ def test_rocky_mask_no_bounds_falls_back():
     assert not rocky_mask(r, None, None, None, None, lower=0.5, upper=1.5, use_interval=True)[0]
 
 
-def test_rocky_mask_interval_false_ignores_bounds():
+def test_rocky_mask_interval_false_respects_bounds():
     # use_interval=False: even with rmin/rmax in range, masked r → False
     r    = _r([0.0], mask=[True])
     rmin = _rb([1.0])
     rmax = _rb([1.3])
-    assert not rocky_mask(r, None, None, rmin, rmax, lower=0.5, upper=1.5, use_interval=False)[0]
+    assert rocky_mask(r, None, None, rmin, rmax, lower=0.5, upper=1.5, use_interval=False)[0]
 
 
 def test_rocky_mask_known_rocky_still_included_in_interval_mode():
