@@ -147,11 +147,11 @@ class Crossmatcher:
         self.alternate_ids = table
         self._ids_for_names = frozenset(name_list)
 
-    def _ensure_alternate_ids(self, name_list: list[str]) -> None:
+    def _ensure_alternate_ids(self, name_list: list[str], **kwargs) -> None:
         """Load or subset the alternate-ID cache to cover exactly name_list."""
         name_set = frozenset(name_list)
         if self.alternate_ids is None or not name_set <= self._ids_for_names:
-            self.load_alternate_ids(name_list)
+            self.load_alternate_ids(name_list, **kwargs)
         elif name_set < self._ids_for_names:
             self._cache_alternate_ids(
                 self.alternate_ids[np.isin(self.alternate_ids[self.id_supplier.input_col], name_list)],
@@ -339,7 +339,7 @@ class Crossmatcher:
         
         return self.id_matched
 
-    def find_duplicates(self, input_table: Table, input_starname_key: str, full: bool = False) -> Table:
+    def find_duplicates(self, input_table: Table, input_starname_key: str, full: bool = False, **kwargs) -> Table:
         """Find input stars that share alternate identifiers.
 
         Performs a self-join on the alternate-ID table to identify groups
@@ -357,7 +357,8 @@ class Crossmatcher:
             If ``False`` (default), return one representative row per
             duplicate group.  If ``True``, return one row per member of
             each group (groups with *n* members contribute *n* rows).
-
+        **kwargs :
+            Passed to load_alternate_ids, accepts ``from_file``
         Returns
         -------
         duplicates : `~astropy.table.Table`
@@ -367,7 +368,7 @@ class Crossmatcher:
             are found.
         """
         name_list = input_table[input_starname_key].tolist()
-        self._ensure_alternate_ids(name_list)
+        self._ensure_alternate_ids(name_list, **kwargs)
 
         input_col = self.id_supplier.input_col
         id_col_name = self.id_supplier.id_col
@@ -387,7 +388,18 @@ class Crossmatcher:
         grouped: pd.DataFrame = self_joined.groupby(input_col)[linked_col].unique().reset_index()
         grouped.rename(columns={linked_col: "duplicate_names"}, inplace=True)
         grouped['duplicate_names'] = grouped['duplicate_names'].apply(lambda x: list(sorted(x)))
-        grouped['appearances'] = grouped['duplicate_names'].apply(len)
+
+        name_counts = pd.Series(name_list).value_counts()
+        repeated_names = set(name_counts[name_counts > 1].index)
+        missing = repeated_names - set(grouped[input_col])
+        if missing:
+            extra = pd.DataFrame({input_col: list(missing), "duplicate_names": [[n] for n in missing]})
+            grouped = pd.concat([grouped, extra], ignore_index=True)
+
+        grouped['appearances'] = grouped.apply(
+            lambda row: max(len(row['duplicate_names']), name_counts.get(row[input_col], 1)),
+            axis=1,
+        )
         grouped = grouped[grouped['appearances'] > 1]
         grouped = grouped.sort_values(by='duplicate_names').reset_index(drop=True)
         if full:
@@ -395,7 +407,7 @@ class Crossmatcher:
         grouped = grouped.drop_duplicates(subset='duplicate_names')
         return Table.from_pandas(grouped)
 
-    def remove_duplicates(self, input_table: Table, input_starname_key: str) -> Table:
+    def remove_duplicates(self, input_table: Table, input_starname_key: str, **kwargs) -> Table:
         """Remove duplicate input rows, keeping the most data-complete copy.
 
         For each group of stars sharing an alternate identifier, retains
@@ -409,35 +421,31 @@ class Crossmatcher:
             Stellar input table containing potential duplicate rows.
         input_starname_key : str
             Name of the column in ``input_table`` that holds star names.
-
+        **kwargs :
+            Passed to load_alternate_ids, accepts ``from_file``
         Returns
         -------
         deduplicated : `~astropy.table.Table`
             Copy of ``input_table`` with one row removed per duplicate
             group (keeping the most complete entry).
 
-        Raises
-        ------
-        ValueError
-            If a name in a duplicate group does not appear exactly once
-            in ``input_table``.
-
         Notes
         -----
         Logs the indices and names of removed rows at INFO level
         (logger ``crossmatching.crossmatcher``).
         """
-        duplicates = self.find_duplicates(input_table, input_starname_key)
+        duplicates = self.find_duplicates(input_table, input_starname_key, **kwargs)
         removed = []
         for dupe in duplicates:
             dupe_names = dupe["duplicate_names"]
-            dupes_index_comparison_array = np.array([input_table[input_starname_key].data == name for name in dupe_names])
 
-            for arr, name in zip(dupes_index_comparison_array, dupe_names):
-                if np.sum(arr) != 1:
-                    raise ValueError(f"Expected exactly one match for each duplicate name, but found {np.sum(arr)} matches for {name}")
+            dupe_indices = []
+            dupe_index_names = []
+            for name in dupe_names:
+                matches = np.where(input_table[input_starname_key].data == name)[0]
+                dupe_indices.extend(matches)
+                dupe_index_names.extend([name] * len(matches))
 
-            dupe_indices = np.where(dupes_index_comparison_array)[1]
             null_counts = [
                 np.isin(list(input_table[idx]), ["", 'null', '0', 0, None]).sum()
                 for idx in dupe_indices
@@ -446,7 +454,7 @@ class Crossmatcher:
             first_minimum_of_null = np.argmax(np.array(null_counts) == min(null_counts))
             removed.extend(
                 (idx, name)
-                for i, (idx, name) in enumerate(zip(dupe_indices, dupe_names))
+                for i, (idx, name) in enumerate(zip(dupe_indices, dupe_index_names))
                 if i != first_minimum_of_null
             )
 
