@@ -50,6 +50,7 @@ def test_id_no_match_when_alternate_ids_empty():
             "pl_name": "Fake Star b",
         }],
         alt_id_pairs=[],
+        query_names=["fake id"],
     )
     input_table = Table({"star_name": ["fake id"]})
     result = cm.id_crossmatch(input_table, "star_name")

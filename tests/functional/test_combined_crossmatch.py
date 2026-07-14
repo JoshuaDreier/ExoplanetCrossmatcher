@@ -20,7 +20,7 @@ def _make_cm_coord_only():
     cm._cache_catalog(make_catalog({"hostname": "Coord Star", "pl_name": "Coord Star b", "ra": 100.0, "dec": 20.0}))
     cm._cache_alternate_ids(
         Table({"input_ids": Column([], dtype="U64"), "id": Column([], dtype="U64")}),
-        [],
+        ["coord-only-input"],
     )
     return cm
 

@@ -570,9 +570,17 @@ class Crossmatcher:
         cat_ra_key = self.catalog.ra_key
         cat_dec_key = self.catalog.dec_key
 
+        ra_data = input_table[ra_key]
+        dec_data = input_table[dec_key]
+        
+        if not hasattr(ra_data, 'unit') or ra_data.unit is None:
+            ra_data = ra_data * ra_unit
+        if not hasattr(dec_data, 'unit') or dec_data.unit is None:
+            dec_data = dec_data * dec_unit
+
         coords_input = SkyCoord(
-            ra=input_table[ra_key]*ra_unit,
-            dec=input_table[dec_key]*dec_unit
+            ra=ra_data,
+            dec=dec_data
         )
         coords_catalog = SkyCoord(
             ra=self.catalog_table[cat_ra_key]*self.catalog.ra_unit,
@@ -598,6 +606,23 @@ class Crossmatcher:
         )
         self.coords2d_matched[self.match_type_key] = self.coord_match_label
         self.coords2d_matched[self.angular_sep_key] = sep2d[sep2d_mask]
+        
+        string_columns = {
+            name
+            for name in self.catalog_table.colnames
+            if self.catalog_table[name].dtype.kind in {"U", "S", "O"}
+        } | {
+            name
+            for name in input_table.colnames
+            if input_table[name].dtype.kind in {"U", "S", "O"}
+        } | {input_starname_key, self.match_type_key}
+        for colname in self.coords2d_matched.colnames:
+            if colname in string_columns and self.coords2d_matched[colname].dtype.kind in {"f", "i", "O"}:
+                self.coords2d_matched[colname] = self.coords2d_matched[colname].astype("U")
+                self.coords2d_matched[colname] = np.char.strip(self.coords2d_matched[colname])
+        
+        self.coords2d_matched[input_starname_key] = self.coords2d_matched[input_starname_key].astype(str)
+        
         return self.coords2d_matched
 
     def combined_crossmatch(
