@@ -1,7 +1,5 @@
 from astropy.table import Table
 
-from crossmatching.config import id_supplier as _cfg
-
 
 class IdSupplierBase:
     """Abstract base class for alternate-ID suppliers.
@@ -18,7 +16,8 @@ class IdSupplierBase:
     ----------
     input_col : str
         Column name for input star names in the alternate-ID table
-        (default ``'input_ids'``, configurable via ``crossmatching.cfg``).
+        (default ``'input_ids'``; override by setting the attribute on a
+        subclass or instance).
     id_col : str
         Column name for alternate identifiers in the alternate-ID table
         (default ``'id'``).
@@ -27,9 +26,9 @@ class IdSupplierBase:
         Rows with this value in ``id_col`` are skipped during matching.
     """
 
-    input_col:     str = _cfg["input_col"]
-    id_col:        str = _cfg["id_col"]
-    null_sentinel: str = _cfg["null_sentinel"]
+    input_col:     str = "input_ids"
+    id_col:        str = "id"
+    null_sentinel: str = "--"
 
     def id_variants(self, id_str: str) -> list[str]:
         """Return the match forms of one identifier: itself plus variants.

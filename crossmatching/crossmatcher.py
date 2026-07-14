@@ -10,7 +10,6 @@ import astropy.units as u
 
 from crossmatching.catalogs.base import CatalogBase
 from crossmatching.id_suppliers.base import IdSupplierBase
-from crossmatching.config import crossmatcher as _cm_cfg
 
 logger = logging.getLogger(__name__)
 
@@ -102,16 +101,30 @@ class Crossmatcher:
         Supplier of the aliases used for ID crossmatching.
         Available ID suppliers: SimbadIdSupplier, EMCIdSupplier.
         Custom ID suppliers can be implemented by extending the IdSupplierBase class.
-    coordinate_search_radius : `~astropy.units.Quantity`, optional
+    minimum_search_radius : `~astropy.units.Quantity`, optional
         Base tolerance for coordinate matching; the per-row radius grows
         with proper-motion displacement (see :func:`allowed_angular_separation`).
         Default 10 arcsec.
-    unknown_search_radius : `~astropy.units.Quantity`, optional
+    default_search_radius : `~astropy.units.Quantity`, optional
         Search radius used for catalog rows whose proper motion or
         coordinate epoch is unknown.  Default 50 arcsec.
     input_suffix : str, optional
         Suffix appended to input-table column names that collide with
         catalog column names in the matched output.  Default ``'input'``.
+    match_type_key : str, optional
+        Name of the output column recording how each row was matched.
+        Default ``'match_type'``.
+    id_match_label : str, optional
+        Value written to ``match_type_key`` for ID-based matches.
+        Default ``'id'``.
+    coord_match_label : str, optional
+        Value written to ``match_type_key`` for coordinate-based matches.
+        Default ``'coordinates'``.  Rows found by both methods are labelled
+        ``f'{id_match_label}+{coord_match_label}'``.
+    angular_sep_key : str, optional
+        Name of the output column holding the angular separation (arcsec)
+        between matched input and catalog positions.
+        Default ``'crossmatching_angular_separation'``.
     """
 
     def __init__(
@@ -121,6 +134,10 @@ class Crossmatcher:
         minimum_search_radius: u.Quantity = 10*u.arcsec,
         default_search_radius: u.Quantity = 50*u.arcsec,
         input_suffix: str = "input",
+        match_type_key: str = "match_type",
+        id_match_label: str = "id",
+        coord_match_label: str = "coordinates",
+        angular_sep_key: str = "crossmatching_angular_separation",
         **kwargs
     ):
         self.catalog = catalog
@@ -128,10 +145,10 @@ class Crossmatcher:
         self.minimum_search_radius = minimum_search_radius
         self.default_search_radius = default_search_radius
         self.input_suffix = input_suffix
-        self.match_type_key   = _cm_cfg["match_type_key"] if "match_type_key" not in kwargs else kwargs["match_type_key"]
-        self.id_match_label   = _cm_cfg["id_match_label"] if "id_match_label" not in kwargs else kwargs["id_match_label"]
-        self.coord_match_label = _cm_cfg["coord_match_label"] if "coord_match_label" not in kwargs else kwargs["coord_match_label"]
-        self.angular_sep_key  = _cm_cfg["angular_sep_key"] if "angular_sep_key" not in kwargs else kwargs["angular_sep_key"]
+        self.match_type_key = match_type_key
+        self.id_match_label = id_match_label
+        self.coord_match_label = coord_match_label
+        self.angular_sep_key = angular_sep_key
         self.catalog_table: Table = None
         self.alternate_ids: Table = None
         self._ids_for_names: frozenset | None = None
@@ -489,11 +506,11 @@ class Crossmatcher:
         proper-motion displacement accumulated since the catalog's
         coordinate epoch::
 
-            radius_i = (pm_i + pm_err_i) * |epoch_i - input_epoch| + coordinate_search_radius
+            radius_i = (pm_i + pm_err_i) * |epoch_i - input_epoch| + minimum_search_radius
 
         Catalog proper-motion values (``pm_key``, ``pmerr_key``) are
         converted to arcsec/yr using ``catalog.pm_unit``.  Rows with unknown
-        proper motion or epoch receive ``unknown_search_radius``
+        proper motion or epoch receive ``default_search_radius``
         (default 50 arcsec, set in the constructor).
 
         Results are stored in ``self.coords2d_matched`` and also returned.
