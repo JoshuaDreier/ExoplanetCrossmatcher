@@ -6,7 +6,7 @@ from crossmatching import EMCCatalog, EMCIdSupplier, Crossmatcher
 
 cme = Crossmatcher(EMCCatalog(), EMCIdSupplier())
 
-# Find groups of names that share a SIMBAD identifier
+# Find groups of names that share an alternate identifier
 dupes = cme.find_duplicates(hpic, input_starname_key="star_name")
 print(dupes["star_name", "duplicate_names", "appearances"])
 

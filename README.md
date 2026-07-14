@@ -41,6 +41,7 @@ The optimal place to work with this library are Jupyter Notebooks
 
 ```python
 from astropy.table import Table
+import astropy.units as u
 from crossmatching import Crossmatcher, NEACatalog, SimbadIdSupplier
 
 # Load input stellar survey
@@ -54,7 +55,6 @@ cm = Crossmatcher(
     minimum_search_radius = 10*u.arcsec,
     default_search_radius = 50*u.arcsec,
     input_suffix = "input",
-    input_epoch = 2000 # depends on coordinate source for input_table, for HPIC it's 2000
 )
 
 
@@ -67,7 +67,9 @@ cm.id_supplier.save_raw(hpic["star_name"], "./input/alternate_ids_hpic.txt") # t
 cm.load_alternate_ids(input_table["star_name"], from_file="./input/alternate_ids_hpic.txt")
 
 # Run the combined crossmatch (ID-based first, then coordinate-based)
-result = cm.combined_crossmatch(input_table, input_starname_key="star_name")
+# input_epoch is the epoch of input_table's coordinates (for HPIC it's 2000). It enables the
+# proper-motion-aware search radius; omit it and every row falls back to default_search_radius.
+result = cm.combined_crossmatch(input_table, input_starname_key="star_name", input_epoch=2000)
 
 
 # viewing the results
@@ -127,7 +129,7 @@ from crossmatching.catalogs.base import CatalogBase
 class MyTAPCatalog(CatalogBase):
     ra_key = "ra"
     dec_key = "dec"
-    hostname_key = "host"       
+    host_key = "host"       
     planet_uid = "planet_name" 
     pm_key = None               
     pmerr_key = None            
@@ -155,7 +157,7 @@ The full user documentation lives in [`docs/`](docs/):
 | [Enrichment](docs/enrichment.md)             | `ParamFiller`, parameter sources, derived columns, candidate masks |
 | [Derived Parameter Inference](docs/derived-parameter-inference.md) | Formulas and citations for enrichment fallback calculations |
 | [Detect Duplicates](detect-duplicates.md)    | Detection and deletion of duplicates based on aliases |
-| [Configuration](docs/configuration.md)       | `crossmatching.cfg` keys and override patterns        |
+| [Configuration](docs/configuration.md)       | Schema-key defaults and constructor override kwargs   |
 | [Testing](docs/testing.md)                   | Types of tests, how to run                            |
 
 ### Enriching Crossmatch Results

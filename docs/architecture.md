@@ -5,7 +5,6 @@
 ```
 crossmatching/
   crossmatcher.py       # Crossmatcher class + allowed_angular_separation()
-  config.py             # crossmatching.cfg defaults
   __init__.py           # Public re-exports
   catalogs/
     base.py             # CatalogBase — abstract interface

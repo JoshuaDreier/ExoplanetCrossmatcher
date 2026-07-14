@@ -1,32 +1,23 @@
 # Configuration
 
-`crossmatching/crossmatching.cfg` provides project-wide defaults for column
-names and match-type labels.  The file is read at import time; values can be
-overridden per-instance via keyword arguments to `Crossmatcher`.
+The schema-key defaults (output column names and match-type labels) are plain
+defaults baked into the code — there is no config file.  Override them
+per-instance with keyword arguments; the defaults are the de-facto standard
+used throughout the project.
 
-## Default values
+## `Crossmatcher` schema keys
 
-### `[id_supplier]` section
+These are constructor keyword arguments of `Crossmatcher`:
 
-| Key             | Default     | Meaning                                                                    |
-| --------------- | ----------- | -------------------------------------------------------------------------- |
-| `input_col`     | `input_ids` | Column name for input star names in the alternate-ID table                 |
-| `id_col`        | `id`        | Column name for alternate identifiers                                      |
-| `null_sentinel` | `--`        | Placeholder string meaning "no identifier available", default from astropy |
-
-### `[crossmatcher]` section
-
-| Key | Default | Meaning |
-|-----|---------|---------|
+| Keyword | Default | Meaning |
+|---------|---------|---------|
 | `match_type_key` | `match_type` | Output column distinguishing the match strategy |
 | `id_match_label` | `id` | Value written to `match_type` for ID-based matches |
 | `coord_match_label` | `coordinates` | Value written to `match_type` for coordinate matches |
-| `angular_sep_key` | `angular_separation` | Output column for angular distance (arcsec, coordinate matches only) |
+| `angular_sep_key` | `crossmatching_angular_separation` | Output column for angular distance (arcsec) |
 
-## Overriding per instance
-
-Pass keyword arguments to `Crossmatcher` to override any config value for that
-instance without editing the file:
+Rows found by both strategies are labelled `f"{id_match_label}+{coord_match_label}"`
+(default `id+coordinates`).
 
 ```python
 cm = Crossmatcher(
@@ -39,20 +30,23 @@ cm = Crossmatcher(
 )
 ```
 
-## Editing `crossmatching.cfg`
+## ID-supplier schema keys
 
-To change defaults project-wide, edit `crossmatching/crossmatching.cfg`.  The
-file is a standard Python `configparser` INI file:
+These are class attributes on `IdSupplierBase` (shared by `SimbadIdSupplier`
+and `EMCIdSupplier`):
 
-```ini
-[id_supplier]
-input_col = input_ids
-id_col = id
-null_sentinel = --
+| Attribute | Default | Meaning |
+|-----------|---------|---------|
+| `input_col` | `input_ids` | Column name for input star names in the alternate-ID table |
+| `id_col` | `id` | Column name for alternate identifiers |
+| `null_sentinel` | `--` | Placeholder meaning "no identifier available" (astropy's masked default) |
 
-[crossmatcher]
-match_type_key = match_type
-id_match_label = id
-coord_match_label = coordinates
-angular_sep_key = angular_separation
+Override them by setting the attribute on a subclass or instance:
+
+```python
+supplier = SimbadIdSupplier()
+supplier.input_col = "star_name"   # instance override
+
+class MyIdSupplier(IdSupplierBase): # subclass override
+    id_col = "identifier"
 ```

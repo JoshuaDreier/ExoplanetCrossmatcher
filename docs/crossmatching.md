@@ -51,7 +51,7 @@ The matching direction is: for each **catalog** row find the nearest **input** s
 If the proper motion of the stars in the catalog are specified, the search radius is not fixed, it grows with the proper-motion displacement accumulated between the catalog's coordinate epoch and the input survey epoch.
 
 ```
-radius_i = (pm_i + pm_err_i) × |epoch_i − input_epoch| + coordinate_search_radius
+radius_i = (pm_i + pm_err_i) × |epoch_i − input_epoch| + minimum_search_radius
 ```
 
 The column keys and units of the proper motion values are taken from the `Catalog` attributes.
@@ -94,8 +94,8 @@ All catalog columns pass through unchanged.  Added columns:
 
 | Column                             | Type              | Note                                                                                                         |
 | ---------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------ |
-| `match_type`                       | `str`             | Can be changed in `crossmatching.cfg`                                                                        |
-| `crossmatching_angular_separation` | Quantity (arcsec) | Only computed for `id_crossmatch()` if `ra_key, dec_key`are passed.<br>Can be changed in `crossmatching.cfg` |
+| `match_type`                       | `str`             | Column name configurable via the `match_type_key` constructor kwarg                                          |
+| `crossmatching_angular_separation` | Quantity (arcsec) | Only computed for `id_crossmatch()` if `ra_key, dec_key`are passed.<br>Column name configurable via the `angular_sep_key` constructor kwarg |
 
 Columns that exist in both the input table and the catalog (other than the starname key) are suffixed with `_input` on the input side. (or whatever is passed to `input_suffix`)
 

@@ -18,7 +18,7 @@ ids = supplier.load_alternate_ids(name_list, from_file="./input/alternate_ids_hp
 The raw result is a two-column table: `input_ids` (input name) and `ids` (pipe-delimited SIMBAD identifiers).
 When loaded this is then expanded into more rows with each input_id and alias pair occupying one row.
 ### Variant expansion
-For each raw identifier, `SimbadIdSupplier` generates up to four additional
+For each raw identifier, `SimbadIdSupplier` generates up to three additional
 variant forms:
 
 | Rule                                | Input                | Output          | Reason                                         |

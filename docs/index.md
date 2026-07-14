@@ -19,7 +19,7 @@ be enriched with stellar and derived planetary parameters from multiple sources.
 | [Derived Parameter Inference](derived-parameter-inference.md) | Formulas, provenance strings, and citations for enrichment fallbacks |
 | [Catalogs](catalogs.md) | `NEACatalog`, `FileCatalog`, `EMCCatalog` — when to use each |
 | [ID Suppliers](id-suppliers.md) | `SimbadIdSupplier`, `EMCIdSupplier` — how alternate IDs are fetched |
-| [Configuration](configuration.md) | `crossmatching.cfg` keys and override patterns |
+| [Configuration](configuration.md) | Schema-key defaults and constructor override kwargs |
 | [Column Reference](column-reference.md) | Full schema for crossmatch and enrichment output tables |
 | [Testing](testing.md) | Test pyramid, guinea-tics gold standard, how to run |
 
