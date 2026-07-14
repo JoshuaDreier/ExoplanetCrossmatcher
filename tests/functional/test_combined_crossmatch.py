@@ -114,3 +114,26 @@ def test_combined_one_id_one_2d():
     match_type = {row["star_name"]: row["match_type"] for row in result}
     assert match_type["id-star"] == "id"
     assert match_type["2d-star"] == "coordinates"
+
+
+def test_combined_crossmatch_does_not_coerce_numeric_catalog_column_to_string():
+    """A shared numeric catalog column should stay numeric even if the input table uses a string dtype."""
+    cm = Crossmatcher(NEACatalog(), SimbadIdSupplier())
+    catalog = make_catalog({"hostname": "Both Star", "pl_name": "Both Star b", "ra": 100.0, "dec": 20.0})
+    catalog["st_teff"] = Column([5000.0], dtype=float)
+    cm._cache_catalog(catalog)
+    cm._cache_alternate_ids(
+        Table({"input_ids": ["both-match-input"], "id": ["Both Star"]}),
+        ["both-match-input"],
+    )
+    input_table = Table({
+        "star_name": ["both-match-input"],
+        "ra": [100.0],
+        "dec": [20.0],
+        "st_teff": Column(["5000.0"], dtype="U32"),
+    })
+
+    result = cm.combined_crossmatch(input_table, "star_name")
+
+    assert result["st_teff"][0] == 5000.0
+    assert result["st_teff_input"][0] == "5000.0"

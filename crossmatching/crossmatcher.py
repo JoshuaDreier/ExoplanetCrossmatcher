@@ -307,18 +307,22 @@ class Crossmatcher:
         self.id_matched = Table.from_pandas(self.id_matched)
 
         # When the merge result is empty, Astropy can infer string columns as float64.
-        # Cast only actual string columns back to strings so vstack can merge correctly.
-        string_columns = {
+        # We cast string-typed catalog columns and input-side suffixed columns back to
+        # strings so vstack can merge correctly without coercing numeric catalog
+        # columns to strings.
+        string_columns = {input_starname_key, self.match_type_key}
+        string_columns.update(
             name
             for name in self.catalog_table.colnames
             if self.catalog_table[name].dtype.kind in {"U", "S", "O"}
-        } | {
-            name
-            for name in self.alternate_ids.colnames
-            if self.alternate_ids[name].dtype.kind in {"U", "S", "O"}
-        } | {input_starname_key, self.match_type_key}
+        )
+        string_columns.update(
+            f"{c}_{self.input_suffix}"
+            for c in overlapping_columns
+            if input_table[c].dtype.kind in {"U", "S", "O"}
+        )
         for colname in self.id_matched.colnames:
-            if colname in string_columns and self.id_matched[colname].dtype.kind in {"f", "i"}:
+            if colname in string_columns and self.id_matched[colname].dtype.kind in {"f", "i", "O"}:
                 self.id_matched[colname] = self.id_matched[colname].astype("U")
                 self.id_matched[colname] = np.char.strip(self.id_matched[colname])
 
@@ -607,15 +611,17 @@ class Crossmatcher:
         self.coords2d_matched[self.match_type_key] = self.coord_match_label
         self.coords2d_matched[self.angular_sep_key] = sep2d[sep2d_mask]
         
-        string_columns = {
+        string_columns = {input_starname_key, self.match_type_key}
+        string_columns.update(
             name
             for name in self.catalog_table.colnames
             if self.catalog_table[name].dtype.kind in {"U", "S", "O"}
-        } | {
-            name
-            for name in input_table.colnames
-            if input_table[name].dtype.kind in {"U", "S", "O"}
-        } | {input_starname_key, self.match_type_key}
+        )
+        string_columns.update(
+            f"{c}_{self.input_suffix}"
+            for c in overlapping_columns
+            if input_table[c].dtype.kind in {"U", "S", "O"}
+        )
         for colname in self.coords2d_matched.colnames:
             if colname in string_columns and self.coords2d_matched[colname].dtype.kind in {"f", "i", "O"}:
                 self.coords2d_matched[colname] = self.coords2d_matched[colname].astype("U")
