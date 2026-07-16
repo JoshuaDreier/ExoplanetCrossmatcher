@@ -9,7 +9,7 @@ A Python library that identifies exoplanet host stars by matching an input stell
 - identifier-based matching
 - coordinate matching
 
-Crossmatch results can be enriched with stellar and derived planetary parameters from multiple sources (HPIC, NASA Exoplanet Archive (abbr. NEA), SIMBAD, K2 EPIC, TESS TOI).
+Crossmatch results can be enriched with stellar and derived planetary parameters from multiple sources, in priority order: HPIC, NASA Exoplanet Archive (abbr. NEA), Extrasolar Planets Encyclopaedia (EU), K2 EPIC, TESS TOI, and SIMBAD.
 
 ## Features
 - Match any list of input stars (with just names or names + coordinates) against the NASA Exoplanet Archive, Exo-MerCat, or other catalogs.
