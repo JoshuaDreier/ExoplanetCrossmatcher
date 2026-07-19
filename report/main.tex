@@ -1,0 +1,108 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{float}
+\usepackage{braket}     
+\usepackage{amsmath}    
+\usepackage{amssymb}    
+\usepackage[utf8]{inputenc}
+\usepackage[american]{babel}
+\usepackage{a4wide}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{tabularray}
+\usepackage{pdflscape}
+\usepackage{lipsum}
+\usepackage{subcaption}
+\usepackage{csquotes}
+\UseTblrLibrary{siunitx}
+
+\usepackage{adjustbox}
+\sisetup{
+    separate-uncertainty = true,
+    table-align-uncertainty = true,
+    detect-weight=true,
+    detect-family=true
+}
+\usepackage{minted}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{parskip}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{varioref}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{datetime}
+\usepackage[version=4]{mhchem}
+\usepackage[font=small]{caption}
+\usepackage[free-standing-units=true, uncertainty-mode=separate, exponent-product=\cdot]{siunitx}
+\usepackage[colorlinks=true, pdfstartview=FitV, linkcolor=black, citecolor=black, urlcolor=black]{hyperref}
+\usepackage[noabbrev,nameinlink]{cleveref}
+\usepackage{enumerate}
+\usepackage{halloweenmath}
+
+\usepackage[
+backend=biber,
+sorting=none
+]{biblatex}
+\addbibresource{ref.bib} 
+
+
+
+\setlength{\headheight}{14pt}
+\newdateformat{monthyeardate}{\monthname[\THEMONTH] \THEYEAR}
+
+\title{Exoplanet Database Crossmatching applied to HPIC and LIFEcat for LIFE target selection}
+\newcommand{\shorttitle}{Exoplanet Database Crossmatching}
+\author{
+      \textbf{Joshua Dreier} \\ \texttt{jodreier@ethz.ch} \\[6pt]
+}
+
+\newcommand{\shortauthors}{J. Dreier}
+\date{\today}
+
+\DeclareSIUnit{\au}{AU}
+\DeclareSIUnit{\Rsun}{R_\odot}
+\DeclareSIUnit{\Msun}{M_\odot}
+\DeclareSIUnit{\Rearth}{R_\oplus}
+\DeclareSIUnit{\Mearth}{M_\oplus}
+\DeclareSIUnit{\Searth}{S_\oplus}
+\DeclareSIUnit{\astronomicalunit}{au}
+\DeclareSIUnit{\parsec}{pc}
+
+\begin{document}
+\maketitle
+
+\vspace{8 cm}
+
+\begin{abstract}
+Target-selection catalogs for missions such as LIFE and NASA's Habitable Worlds Observatory benefit from knowing which already-known exoplanets orbit their candidate stars. We present an open-source, catalog-agnostic Python package that crossmatches a stellar catalog against a planetary catalog and enriches the matched planets with stellar and planetary parameters. Applied to HPICxLIFEcat, a stellar catalog extending HPIC with the non-binary M dwarfs of LIFEcat, the pipeline combines identifier-based matching, using alternate identifiers from SIMBAD and Exo-MerCat, with a coordinate-based matching fallback, against both the NASA Exoplanet Archive and Exo-MerCat. Missing parameters are filled in from a priority-ordered set of catalog sources and physically motivated fallback derivations. We calibrate the coordinate-matching thresholds, characterize the resulting matching yield, and use the enriched catalog to identify confirmed and candidate rocky, temperate planets around HPICxLIFEcat stars, providing a target list relevant to LIFE's search phase.
+\end{abstract}
+
+\newpage
+
+\pagestyle{fancy}
+\fancyhead[LO]{\shorttitle}
+\fancyhead[CO]{\monthyeardate\today}
+\fancyhead[RO]{\shortauthors}
+
+\setcounter{page}{1}
+
+\input{s0_intro}
+\input{s1_methods}
+\input{s2_results}
+\input{s3_conclusion}
+
+\newpage
+\section{Acknowledgments}
+The author thanks  his advisor Lia Sartori for their guidance, continuous support and prompt responses, as well as his friends, Pascal D'Andrea and Johanna Kroker for proofreading and helpful discussions.
+
+The author acknowledges using generative AI (Claude Code, Google Gemini) for the purpose of aiding in formatting the \LaTeX-document, \texttt{matplotlib.pyplot} plots and as a search tool for finding relevant literature. The python package was extensively tested with AI-written testcases, the relevance and truthfulness of which was always verified by the author. The author notes that no AI tools were used in the textual writing of the document (with the exception of checking for typos, and converting the summary into an abstract) and in the core logic of the code, excluding the aforementioned test cases.
+\vspace{3cm}
+\printbibliography
+
+\input{s4_appendix}
+
+
+\end{document}
+ 

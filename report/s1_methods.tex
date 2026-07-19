@@ -1,0 +1,97 @@
+\newpage
+\section{Methods}
+
+
+\subsection{Python Package}
+The crossmatching and enrichment pipeline described in this work is implemented as an open-source Python package, available at \sloppy{\url{https://github.com/JoshuaDreier/ExoplanetCrossmatcher}}. It makes extensive use of the package \texttt{astropy} \cite{astropy:2013, astropy:2018, astropy:2022}, using \texttt{astropy.table.Table} as the primary data structure throughout, so  that all intermediate and final outputs are directly compatible with the broader astronomical Python ecosystem. Astropy's connection to \texttt{pandas} \cite{pandas} and \texttt{numpy} \cite{numpy} was leveraged at multiple points in the code. Remote catalog access is handled via the Table Access Protocol (TAP) through \texttt{pyvo} (package associated with Astropy), with queries issued to the NASA Exoplanet Archive and SIMBAD endpoints. The package was developed and tested under Python~3.14.                      
+The package was written in a catalog-agnostic way, such that the planetary catalog as well as the stellar catalog are parameters of the code and can easily be changed. The same is true for the service supplying alternate identifiers. The NASA Exoplanet Archive and Exo-MerCat catalog were implemented and specifically developed for this project. As a source for alternate identifiers SIMBAD and Exo-MerCat were added. For instructions and details on the crossmatching and enrichment code, refer to the code documentation contained in the repository.
+
+Using $\texttt{pytest}$ \cite{pytest}, an end-to-end test suite uses the written code to match a set of known exoplanet host stars against all supported catalog and identifier-supplier combinations, asserting both that all expected planets are recovered and that no false positives are introduced. The identifier  normalization rules described in \cref{sec:id_matching} were each developed by inspecting coordinate-matched planets that were not recovered by  identifier matching, and were only retained after confirming they introduced no spurious matches in the test set.
+Furthermore, functional tests and unit tests were written alongside the crossmatching and enrichment code, double-checking most non-trivial functions for possible bugs, ensuring that human-made coding errors are mitigated before `live-runs` yielding the actual data for this report.
+
+\subsection{Identifier-based crossmatching}
+\label{sec:id_matching}
+
+Matching stellar catalogs by name is the most precise crossmatching strategy available: when the same physical object appears in both the input survey and the planet catalog under a common identifier, no position measurement is required and no false positives from chance alignments can arise.
+The pipeline therefore prioritizes identifier-based matches over coordinate-based ones.
+
+A key challenge in name-based catalog matching is that astronomical objects carry many designations: TIC numbers, HD/HIP/Gaia identifiers, common names, etc. none of which are guaranteed to appear in every catalog. To overcome this, the crossmatching queries the SIMBAD astronomical database \cite{Simbad} for every star in the input catalog, retrieving the full set of known identifiers for each object.
+For out input catalog, this produces a table of roughly 300\,000 (input-star, alias) pairs. Exo-MerCat already provides an "alternate-identifiers" column, in which case the identifiers are taken from there and the SIMBAD querry is omitted (Note that Exo-MerCat uses SIMBAD internally). 
+
+SIMBAD Identifier strings are not always directly compatible with how the stars are named in planetary catalogs. Therefore a few additional alternative identifiers are computed to increase the number of correct matches. Here follows a list of the additional alternate identifiers added for each identifier of a certain type. This was done by manually looking of the sample of coordinate-matched but not ID-matched planets and inspecting their alternate identifiers. This way most naming inconsistencies in the catalog dataset became apparent and were adjusted for:
+\begin{enumerate}
+    \item White-Space is normalized for all identifiers, some services store double spaces between catalog names and numbers (e.g. SIMBAD's \ \texttt{Ross~~128})
+    \item Object-type prefixes (\texttt{*} or \texttt{**}) are stripped (e.g.\ \texttt{* alf~Cen} $\to$ \texttt{alf~Cen}), 
+    \item The \texttt{NAME} prefix is removed (e.g.\ \texttt{NAME Proxima~Cen} $\to$ \texttt{Proxima~Cen})
+    \item Possessive suffixes are dropped (e.g.\ \texttt{Barnard's} $\to$ \texttt{Barnard}).
+\end{enumerate}
+
+If the IDs are taken from Exo-MerCat other normalization rules are applied 
+\begin{enumerate}
+    \item White-space normalization
+    \item capitalizing the \texttt{Gaia} prefix to \texttt{GAIA}
+    \item TIC identifiers (\texttt{TIC-}\textit{N}) to the space-separated form (\texttt{TIC~}\textit{N}) 
+\end{enumerate} 
+ All of these extra rules were verified to not produce extra false positives by comparing the entirety of the matched planets with a rule added to the same sample matched without that rule and confirming that the differently matched planets are close-enough in coordinates or in some cases manually inspecting them using SIMBAD to see if they are the same object.
+ 
+
+In \cref{sec:results} (Results) it is made clear that this is the most important matching method by number of matched planets.
+
+Identifier crossmatching can also be used to detect and delete duplicates appearing, for example after merging parts of LIFEcat with HPIC.
+
+\subsection{Coordinate-based matching}
+Coordinate-based crossmatching serves as a complementary fallback for planets whose host star name could not be matched by any known identifier. For each row in the planet catalog, the closest star in the input catalog is found by angular distance, and the pair is accepted if that distance falls 
+within a certain search radius $r$.
+
+This is deliberately asymmetric. The search runs over the planet catalog, not the input catalog. This naturally handles multi-planet systems, such that all planets sharing a host star are each matched independently to the same input star. 
+
+The search radius is not the same for all planets. For catalog rows where the proper motion $\mu$ and its upper uncertainty $\sigma^+_\mu$ are known, the radius grows with the  expected positional drift between the planet catalog's coordinate epoch and the input catalog's epoch:
+\begin{equation}
+    r = (\mu + \sigma_{\mu}^+)\,|\Delta t_i| + r_0
+\end{equation}
+where $r_0 = 10''$ is the base tolerance and $\Delta t_i$ is the epoch difference in years.  
+Since proper motion is typically assumed to be approximately uniform rectilinear motion \cite{GaiaEDR3Astrometry}, this formula describes an approximate maximum angular distance a star can have traveled in the time between the two epochs.
+For rows where the proper motion or epoch is unknown, a conservative flat radius of $50''$ is used instead. These values are calibrated empirically in \cref{sec:coordinate_calibration}.
+With the current implementation, proper motion needs to be present as a property of the host star on the planet catalog side. Thus, only crossmatching against the NASA Exoplanet Archive can make use of the proper-motion-sensitive coordinate crossmatching, as it carries the PM values for its host star, which all other catalog sources of Exo-MerCat and Exo-MerCat itself do not. In principle however, with significant code adjustments, the matching algorithm could be written to take into account the proper motion on the stellar catalog side instead. As shown in the results section, the difference in accuracy is not large for our sample, because of the sparse density of exoplanet catalog entries at the time of writing.
+
+
+The adopted tolerances are large compared to the $1''$ used in Exo-MerCat v2.1.0 (Exo-MerCat v1.0.0 used search radii of up to 36'')\cite{Alei_2025}. This is deliberate, as the appropriate value should be determined by the positional uncertainties of both catalogs, the epoch difference between them, and the on-sky density of the searched catalog. Since NEA does not publish per-row positional uncertainties and its coordinates are heterogeneously sourced (cf. \cref{sec:coordinate_calibration}), the uncertainty term is replaced by the fixed base tolerance $10''$, chosen generously enough to absorb the worst coordinate entries. 
+Such generous radii are only admissible because the searched catalog is sparse. HPICxLIFEcat contains roughly $10^4$ stars spread over the full sky, corresponding to a surface density of $\rho\approx 2\times10^{-8} \,\text{arcsec}^{-2}$. The probability of a chance alignment is therefore of order $\pi r^2 \cdot \rho \approx \num{2E-6}$ per planet row for the base tolerance and $\num{5E-5}$ for the $50''$ fallback, yielding an expectation value of $\sim 0.65$ false matches and luckily none are found in the empirical calibration (\cref{sec:coordinate_calibration}). 
+
+\subsection{Post-matching data enrichment}
+
+After crossmatching, many planet catalog rows are missing stellar or orbital parameters needed for candidate filtering or other uses. An enrichment step fills these gaps by merging values from additional catalog sources in a fixed priority order. The sources used here are, from highest to lowest priority: the input HPIC catalog, the NASA Exoplanet Archive composite parameters table, the Exoplanets Encyclopaedia, the K2 EPIC catalog, the TESS Objects of Interest catalog, and SIMBAD stellar parameters. The first source that provides a non-masked value for a given parameter is taken as the entry for that quantity. 
+
+After sourcing, for still missing parameters, calculations are executed to give broad estimates for a subset of the sourced quantities. Each output parameter is accompanied by a provenance string that records which source or formula supplied the value.
+
+The list of parameters that are sourced from catalogs are: planetary radius $r_p$, planetary mass $m$, projected planetary mass ($m \sin i $) planetary insolation flux $S$, planetary equilibrium temperature $T_\text{eq}$, orbital semi-major axis $a$, orbital period $P$, host star spectral type (MK system), host star radius $R_*$, host star mass $M_*$, host star effective temperature $T_\text{eff}$, host star surface gravity $\log g_*$, host star metallicity $\ce{Fe/H}$, host star luminosity $L_*$, host system distance $d$ and the magnitude brightness of the host star system in the Visual and Kepler bands.
+
+For parameters that remain missing after source merging, a cascade of physically motivated fallback derivations is applied. Treating the variables as uncorrelated, gaussian error propagation is applied where possible to retain a sense of accuracy after the quantities have been computed. The derivations execute in the order listed below, each running only when its inputs are available and the target quantity is still missing.
+\begin{itemize}
+    \item Host star effective temperature: Inferred from spectral type, interpolating between anchors from \textcite{PecautMamajek2013} and \textcite{Martins2005}, or via Stefan Boltzmann relation $T_\text{eff}^4\propto \dfrac{L_*}{R_*²}$
+    \item Host star Luminosity: $L_\star \propto  R_\star^2 T_\mathrm{eff}^4$ (Stefan-Boltzmann)
+    \item Host star radius: The following options are tried, stopping at the first success, (methods decreasing in precision):
+    \begin{itemize}
+        \item $R_*^2 \propto M_* / g_*$
+        \item $R_*^2 \propto \dfrac{L_* }{T_\text{eff}^4}$  (Stefan Boltzmann)
+        \item \textcite{Mann2015} empirical relation dependent on the absolute K-band magnitude $M_K$, which is calculated from the K-band magnitude and distance (only applicable for $T_\text{eff} < \qty{4200}{\kelvin}$ and $M_K \in[4.0, 10.5]$). Then $R_*$ follows from a second degree polynomial in $M_K$ with a prefactor dependent on $\ce{Fe/H}$.
+        \item \textcite{Torres2010} empirical relation applicable ($T_\text{eff}$ from $\qtyrange{3900}{8500}{\kelvin}$), giving $\log R_*$ as a third degree polynomial in $\log T_\text{eff}, \log g, \ce{Fe/H}$.
+        \item \textcite{Mann2015} empirical relation for late K and M dwarfs ($T_\text{eff} < \qty{4000}{\kelvin}$), giving $R_*$ as a third degree polynomial in $T_\text{eff}$
+        \item \textcite{Boyajian_2012one,Boyajian_2012two, Boyajian_2013} zero-age main-sequence relation between $R_*$ and $T_\text{eff}$, expressed as a piece-wise power law clamped at $\qty{0.05}{\Rsun}$
+    \end{itemize}
+    \item Host star mass: $M_* \propto R_*^2 g_*$
+    \item Orbital semi-major axis:  $a^3  \propto M_* P^2 $ (Kepler's third law)
+    \item Planet Equilibrium Temperature: $T_\text{eq} ^4\propto S$, (taking earth's eq. temperature with a Bond albedo of $A_B  = 0.3$ as a reference.)
+    \item Planet insolation: $S \propto L/a^2$ or via reversing equilibrium temperature formula above
+
+\end{itemize}                  
+Further calculation details can be found in the code documentation. A breakdown of the number of times each computation was employed for the dataset we are working with can be found in \cref{fig:enrichment_mermaid} in the appendix \cref{appdx:enrichment}. The enrichment leads to $\sim50$\% more more planet entries in Exo-MerCat having insolation values that we can work with to characterize the population in \cref{sec:results}. 
+
+For radial-velocity planets with no directly measured radius, radius bounds are estimated from $m\sin i$ using the Chen \& Kipping \citeyear{ChenKipping2017} probabilistic mass-radius relation. The lower bound is $R_\mathrm{CK}(m\sin i)$ and the upper bound is $R_\mathrm{CK}(m\sin i 
+/ \sin i_\mathrm{min})$ with a default $\sin i_\mathrm{min} = 0.3$, based on averaged posterior-distribution estimates from \textcite{HoTurner2011}, giving a broad interval that keeps such planets visible in candidate-filtering workflows without asserting a definite radius. Similarly planet with known masses but unknown radius are given radius estimates with the same relation. This is the case for around 10\% of all Exo-MerCat planets.
+
+These enriched parameters are then used to classify planets as potentially rocky ($r_p$ from $\qtyrange{0.5}{1.5}{\Rearth}$) and potentially temperate ($S$ from $\qtyrange{0.35}{1.7}{\Searth}$), described further in Section~\ref{sec:results}, in accordance with the definition given in \cref{lab:hz_def}.
+
+
+\subsection{Exo-MerCat}
+At the time of writing, the Exo-MerCat \cite{Alei_2020, Alei_2025} TAP service is not actively updated. To guarantee up-to-date results, a local installation was used. The results in this report are based on Exo-MerCat v2.1.0 run on July 13, 2026, using the source catalogs most recent versions at that time.

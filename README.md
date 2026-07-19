@@ -14,7 +14,7 @@ Crossmatch results can be enriched with stellar and derived planetary parameters
 ## Features
 - Match any list of input stars (with just names or names + coordinates) against the NASA Exoplanet Archive, Exo-MerCat, or other catalogs.
 - SIMBAD alternate-ID resolution handles some inconsistent catalog spellings
-- Per-row coordinate search radius grows with proper motion to avoid epoch mismatches (only applies to )
+- Per-row coordinate search radius grows with proper motion to avoid epoch mismatches (only applies to crossmatching with NASA exoplanet archive)
 - File-based caching, function to download once, then run offline 
 - Priority-ordered stellar parameter merging from a variety of catalogs with asymmetric error propagation
 - Configurable Rocky and temperate planet classification masks
@@ -100,8 +100,8 @@ result = cm.coordinate_crossmatch(input_table, ra_key="ra", dec_key="dec") # tho
 
 ### Crossmatching with Exo-MerCat
 The code from above just changes in the used classes and loaded file names.
-Note that at time of writing the [Exo-MerCat TAP](https://exo-mercat.readthedocs.io/en/latest/run_tap.html) service is not kept up to date (and missing the alias column), so ideally clone [Exo-MerCat](https://github.com/Exo-MerCat/Exo-MerCat), and copy the resulting `exomarcat.csv`file to this directory. A timestamped version is provided in this projects `input/` directory.
-Note also that exomercat provides no information on proper motion. so default_search_radius will be used for all coordinate matched.
+Note that at time of writing the [Exo-MerCat TAP](https://exo-mercat.readthedocs.io/en/latest/run_tap.html) service is not kept up to date (and missing the alias column), so ideally clone [Exo-MerCat](https://github.com/Exo-MerCat/Exo-MerCat), and copy the resulting `exomarcat.csv`file to this directory. A timestamped version is provided in this projects `input/` directory. (similarly the `eu_init.csv`/`epic_init.csv`/`toi_init.csv` parameter-source snapshots used in [Enrichment](docs/enrichment.md) were sourced on 2026-07-11, these are also exports of Exo-MerCat or can be retrieved via TAP from their respective services).
+Note also that Exo-MerCat provides no information on proper motion. so `default_search_radius will be used for all coordinate matched.
 
 ```python
 from astropy.table import Table

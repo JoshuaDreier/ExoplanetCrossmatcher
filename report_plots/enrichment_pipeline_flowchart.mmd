@@ -1,0 +1,111 @@
+
+%%{init: {"theme": "base", "layout": "elk", "elk": {"nodePlacementStrategy": "BRANDES_KOEPF"}}}%%
+flowchart TB
+    subgraph CAT["EMC Catalog"]
+            direction LR
+            R_J["$$r_p$$"]
+            MSI["$$m\sin i$$"]
+            A_C["$$a$$"]
+            P_C["$$P$$"]
+        end
+    subgraph SRCS["Stellar Param Sources"]
+        direction TB
+        subgraph CATS["Input Catalogs"]
+            direction TB
+            NEA["<b>NASA Exoplanet Archive</b>"]
+            EU["<b>Exoplanets Encyclopaedia</b>"]
+            EPIC["<b>EPIC (K2)</b>"]
+            TOI["<b>TOI (TESS)</b>"]
+            SIM["<b>SIMBAD</b>"]
+        end
+        NEA  -->|"5949"| KMAG["K mag"]
+        EPIC -->|"958"| KMAG
+        SIM  -->|"6438"| KMAG
+        EU   -->|"1743"| KMAG
+        NEA  -->|"2284"| SPEC["spec type"]
+        EPIC -->|"141"| SPEC
+        SIM  -->|"2897"| SPEC
+        TEFF -->|"10810"| SPEC
+        NEA  -->|"5944"| TEFF["$$T_{\mathrm{eff}}$$"]
+        EPIC -->|"535"| TEFF
+        TOI  -->|"5107"| TEFF
+        SIM  -->|"640"| TEFF
+        EU   -->|"2626"| TEFF
+        NEA  -->|"5918"| LOGG["$$\log g$$"]
+        EPIC -->|"430"| LOGG
+        TOI  -->|"4816"| LOGG
+        SIM  -->|"2551"| LOGG
+        NEA  -->|"5615"| MET["$$[\text{Fe/H}]$$"]
+        EPIC -->|"242"| MET
+        TOI  -->|"0"| MET
+        SIM  -->|"1833"| MET
+        EU   -->|"2128"| MET
+        NEA  -->|"5922"| RSTAR["$$R_\star$$"]
+        EPIC -->|"941"| RSTAR
+        TOI  -->|"4835"| RSTAR
+        EU   -->|"2601"| RSTAR
+        TEFF --> |"306"| ZAMS["<b>[4] ZAMS Fallback</b><br/>$$R_\star\approx(T_{\mathrm{eff}}/T_\odot)^{n(spec)}$$"]
+        SPEC -->|"99"| ZAMS
+        ZAMS -. "306" .-> RSTAR
+        KMAG -->|"140"| MANN["<b>[1] Mann Mks</b><br/>$$R_\star=f(M_{K_s},[\text{Fe/H}])$$"]
+        MET  -->|"21"| MANN
+        MANN -. "140" .-> RSTAR
+        TEFF -->|"202"| MANNTEFF["<b>[3] Mann Teff</b><br/>$$R_\star=f(T_{\text{eff}},[\text{Fe/H}])$$"]
+        MET  -->|"14"| MANNTEFF
+        MANNTEFF -. "202" .-> RSTAR
+        TEFF -->|"199"| TORRES["<b>[2] Torres 2010</b><br/>$$R_\star=f(T_{\text{eff}},\log g,[\text{Fe/H}])$$"]
+        LOGG -->|"199"| TORRES
+        MET  -->|"170"| TORRES
+        TORRES -. "199" .-> RSTAR
+        NEA  -->|"6216"| MSTAR["$$M_\star$$"]
+        EPIC -->|"282"| MSTAR
+        EU   -->|"2900"| MSTAR
+        LOGG  --> |"5414"| MLOG["$$M_\star=10^{\log g-\log g_\odot+2\log_{10}R_\star}$$"]
+        RSTAR --> |"5414"| MLOG
+        MLOG  -. "5414" .-> MSTAR
+        NEA   -->|"5927"| LSTAR["$$L_\star$$"]
+        EPIC  -->|"111"| LSTAR
+        RSTAR -->|"9056"| LUM["$$L_\star=R_\star^2(T_{\mathrm{eff}}/T_\odot)^4$$"]
+        TEFF  --> |"9056"| LUM
+        LUM   -. "9056" .-> LSTAR
+    end
+
+    FCALC["$$F=L_\star/a^2$$"]
+    MSTAR -->|"6062"| KEPL["$$a = \left(M_\star \left(\frac{P}{yr}\right)^2\right)^{1/3}$$"]
+    P_C   -->|"14811"| KEPL
+
+    A_C  -->|"8672"| AFIN["$$a$$"]
+    KEPL -. "6062" .-> AFIN
+    AFIN  -->|"8672"| FCALC
+    AFIN  -. "6062" .-> FCALC
+    LSTAR  -->|"6038"| FCALC
+    LSTAR  -. "9056" .-> FCALC
+
+    subgraph CLASS["Classification"]
+        direction LR
+        ROCKY[/"rocky$$\; r_p\in[0.5,1.5]\,R_\oplus$$"/]
+        TEMP[/"temperate$$\; F_{\mathrm{rel}}\in[0.35,1.7]\,S_\oplus$$"/]
+    end
+
+    NEA   -->|"4408"| FLUX["$$F_{\mathrm{rel}}$$"]
+    EPIC  -->|"30"| FLUX
+    TOI   -->|"5352"| FLUX
+    FCALC -. "5182" .-> FLUX
+    FLUX  -->|"9790"| TEMP
+    FLUX  -. "5182" .-> TEMP
+
+    R_J -->|"12846"| REARTH["$$r_p$$ (or bounds)"]
+    MSI -->|"1606"| CK["M-R-rel + msini + i prior [1,2]"]
+    CK  -. "1606" .-> REARTH
+    REARTH  -->|"12846"| ROCKY
+    REARTH  -. "1606" .-> ROCKY
+    style NEA  fill:#dde8f7,stroke:#1a6fba,color:#1a6fba
+    style EU   fill:#fff4d6,stroke:#b8860b,color:#8a6508
+    style EPIC fill:#fde9dc,stroke:#d4550d,color:#d4550d
+    style TOI  fill:#dcf5dc,stroke:#2a8a2a,color:#2a8a2a
+    style SIM  fill:#f0e0fa,stroke:#7b42a8,color:#7b42a8
+    linkStyle 0,4,8,13,17,22,39,45,58 stroke:#1a6fba,stroke-width:2px
+    linkStyle 3,12,21,25,41 stroke:#b8860b,stroke-width:2px
+    linkStyle 1,5,9,14,18,23,40,46,59 stroke:#d4550d,stroke-width:2px
+    linkStyle 10,15,19,24,60 stroke:#2a8a2a,stroke-width:2px
+    linkStyle 2,6,11,16,20 stroke:#7b42a8,stroke-width:2px

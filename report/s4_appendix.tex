@@ -1,0 +1,50 @@
+\appendix   
+
+ \section{Enrichment Pipeline}
+  \label{appdx:enrichment}
+ 
+ \begin{figure}[H]
+     \centering
+     \vspace{-0.5cm}
+     \includegraphics[width=0.9\linewidth]{figures/enrichment_pipeline_flowchart.pdf}
+     \vspace{-4cm}
+     \caption{The flowchart illustrates the priority-ordered data retrieval hierarchy from input sources and the subsequent empirical or  physical derivation pathways used to determine stellar parameters and orbital/planetary quantities. Solid arrows represent directly retrieved catalog values, while dashed arrows denote computed properties, with labels indicating the exact number of planet-rows processed through each transition.}
+     \label{fig:enrichment_mermaid}
+ \end{figure}
+
+
+\section{Planet distribution without parameter computations}
+\label{appddx:nocomp}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth]{figures/radius_insolation_distribution_uncomputed.pdf}
+    \caption{Distribution of the enriched Exo-MerCat exoplanet population in terms of planet-radius insolation (contains no parameter computations). Confirmed planets are drawn in the darker shade and unconfirmed candidates in the lighter shade. The red rectangle marks the rocky-and-temperate selection region adopted in this work, spanning a radius of $0.5$--$1.5\,R_\oplus$ and an incident stellar flux of $0.35$--$1.7\,S_\oplus$.}
+    \label{fig:pop_distr_nocomp}
+\end{figure}
+
+\section{Population by Host Spectral Category}
+\label{appdx:spectral_category}
+
+\Cref{fig:pop_heatmap_spectral} splits the planet-radius--insolation density of \cref{fig:pop_heatmap} by the spectral category assigned to the host star by the enrichment pipeline. As expected from the broader field, Sun-like hosts dominate the overall Exo-MerCat population. In the distance-limited HPICxLIFEcat crossmatch, however, the low- and very-low-luminosity categories carry a markedly larger share of the sample ($\sim$35\% of the crossmatched planets versus $\sim$12\% of the full catalog), reflecting the abundance of cool, low-mass stars in the immediate solar neighborhood that dominates the LIFE target list.
+
+\begin{figure}[H]
+    \centering
+        \includegraphics[width=0.9\linewidth]{figures/radius_insolation_heatmap_by_spectral_category.pdf}
+    \caption{Two-dimensional number density of the exoplanet population in the planet-radius--insolation plane (as in \cref{fig:pop_heatmap}), split by the spectral category of the host star. The four rows correspond to the host categories assigned by the enrichment pipeline (Very-low-luminosity, Low-luminosity, Sun-like, and Other); the left column is the distance-limited HPIC$\times$LIFEcat sample crossmatched with Exo-MerCat and the right column the entire Exo-MerCat catalog. Both axes are logarithmic and the color encodes the number of planets per bin on a logarithmic scale, shared across all panels. The red rectangle marks the rocky-and-temperate selection region ($0.5$--$1.5\,R_\oplus$, $0.35$--$1.7\,S_\oplus$). Planet radii and insolations are those provided by the enrichment pipeline.}
+    \label{fig:pop_heatmap_spectral}
+\end{figure}
+
+\section{Rocky, Temperate Planet Candidate Tables}
+\label{appdx:rocky_temp_tables}
+
+\Cref{tab:rocky_temp_table} lists the rocky, temperate planet candidates in the distance-limited HPIC$\times$LIFEcat sample crossmatched with Exo-MerCat (the same population as the top panel of \cref{fig:rocky_temp_yield}); \cref{tab:rocky_temp_table_full} lists the same selection applied to the entire enriched Exo-MerCat catalog (the bottom panel of \cref{fig:rocky_temp_yield}). 
+
+\begin{landscape}
+\centering
+\input{figures/rocky_temperate_candidates_table.tex}
+\end{landscape}
+
+\begin{landscape}
+\centering
+\input{figures/rocky_temperate_candidates_table_full.tex}
+\end{landscape}
