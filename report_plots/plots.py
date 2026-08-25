@@ -41,7 +41,10 @@ def _log_hist2d(x_raw, y_raw, log_x_edges, log_y_edges):
     return x_edges, y_edges, z_log
 
 
-def double_hist_heatmap(catalog1, catalog2, catalog1_name, catalog2_name, figsize=(12, 5), title=None):
+def double_hist_heatmap(catalog1, catalog2, catalog1_name, catalog2_name,
+                        figsize=(12, 5), title=None, stellar_bars=False):
+    from collections import Counter
+
     n_bins_x = 60
     n_bins_y = 45
     log_x_edges = np.linspace(np.log10(0.3), np.log10(100), n_bins_x + 1)
@@ -56,11 +59,25 @@ def double_hist_heatmap(catalog1, catalog2, catalog1_name, catalog2_name, figsiz
     x2_edges, y2_edges, z2 = _log_hist2d(catalog2['r_earth'][~cat2_mask], catalog2['pl_insol'][~cat2_mask], log_x_edges, log_y_edges)
     vmax = max(z1.max(), z2.max())
 
-    fig, axes = plt.subplots(1, 2, figsize=figsize, sharex=True, sharey=True)
+    # ---- build figure layout ------------------------------------------------
+    if stellar_bars:
+        fig, all_axes = plt.subplots(
+            2, 2, figsize=figsize,
+            gridspec_kw={'height_ratios': [4, 1], 'hspace': 0.55, 'wspace': 0.15},
+        )
+        heat_axes = all_axes[0]
+        bar_axes  = all_axes[1]
+        # heatmaps share x/y, bars are independent
+        heat_axes[1].sharey(heat_axes[0])
+        heat_axes[1].sharex(heat_axes[0])
+    else:
+        fig, heat_axes = plt.subplots(1, 2, figsize=figsize, sharex=True, sharey=True)
+        bar_axes = None
 
+    # ---- heatmap row --------------------------------------------------------
     mesh = None
     for ax, x_edges, y_edges, z_log, name in zip(
-        axes, [x1_edges, x2_edges], [y1_edges, y2_edges], [z1, z2], [catalog1_name, catalog2_name]
+        heat_axes, [x1_edges, x2_edges], [y1_edges, y2_edges], [z1, z2], [catalog1_name, catalog2_name]
     ):
         mesh = ax.pcolormesh(x_edges, y_edges, z_log, cmap=_CMAP, vmin=0, vmax=vmax, shading='flat', edgecolors='face', rasterized=True)
         ax.set_xscale('log')
@@ -81,10 +98,48 @@ def double_hist_heatmap(catalog1, catalog2, catalog1_name, catalog2_name, figsiz
         ax.yaxis.set_major_formatter(FixedFormatter([str(v) for v in yticks]))
         ax.set_xlabel(r"Radius $R_p \; [R_\oplus]$")
 
-    axes[0].set_ylabel(r"Insolation $S_p \; [S_\oplus]$")
+    heat_axes[0].set_ylabel(r"Insolation $S_p \; [S_\oplus]$")
 
-    fig.subplots_adjust(right=0.88, wspace=0.15)
-    cax = fig.add_axes([0.90, 0.15, 0.02, 0.7])
+    # ---- stellar-distribution bar row (opt-in) ------------------------------
+    if stellar_bars and bar_axes is not None:
+        labels = CATEGORY_ORDER
+        colors = [CATEGORY_COLORS[l] for l in labels]
+
+        for ax, catalog in zip(bar_axes, [catalog1, catalog2]):
+            spec_counts = Counter(catalog['spectral_category'])
+            values = [spec_counts[l] for l in labels]
+            total = sum(values)
+
+            left = 0
+            for i_bar, (val, lab, col) in enumerate(zip(values, labels, colors)):
+                ax.barh(0, val, left=left, color=col, label=lab)
+                pct = round(val / total * 100)
+                ax.text(left + val / 2, 0,
+                        f'{pct}%',
+                        ha='center', va='center', fontsize=7)
+                left += val
+
+            ax.set_xlim(0, total)
+            ax.axis('off')
+
+        # true horizontal center of the two bar axes
+        x_center = (bar_axes[0].get_position().x0 + bar_axes[1].get_position().x1) / 2
+        bar_top = bar_axes[0].get_position().y1
+        fig.text(x_center, bar_top + 0.02, 'Host star spectral categories',
+                 ha='center', va='bottom', fontsize=10)
+
+        # single shared legend below the bar row
+        handles, lbl = bar_axes[0].get_legend_handles_labels()
+        bar_bottom = bar_axes[0].get_position().y0
+        fig.legend(handles, lbl, loc='upper center',
+                   bbox_to_anchor=(x_center, bar_bottom), ncol=len(labels), frameon=False,
+                   fontsize=8)
+
+    # ---- colorbar (aligned to heatmap row only) -----------------------------
+    fig.subplots_adjust(right=0.88)
+    heat_bottom = heat_axes[0].get_position().y0
+    heat_top    = heat_axes[0].get_position().y1
+    cax = fig.add_axes([0.90, heat_bottom, 0.02, heat_top - heat_bottom])
     cbar = fig.colorbar(mesh, cax=cax)
     cbar.set_label("Count")
 
