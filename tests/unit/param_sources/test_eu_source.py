@@ -65,3 +65,21 @@ def test_returns_empty_for_missing_planet():
 def test_key_col_is_eu_name():
     assert EuParamSource.key_col == "eu_name"
 
+
+
+def test_errors_attach_to_matching_fields():
+    src = EuParamSource()
+    table = _eu_table({"name": "HD 1 b", "star_mass": 1.0, "radius": 1.2, "mass": 2.0, "mass_sin_i": 3.0})
+    for col, val in [
+        ("radius_error_min", 0.1), ("radius_error_max", 0.2),
+        ("mass_error_min", 0.3), ("mass_error_max", 0.4),
+        ("mass_sin_i_error_min", 0.5), ("mass_sin_i_error_max", 0.6),
+    ]:
+        table[col] = [val]
+    _loaded(src, table)
+    result = src.get(_emc_row("HD 1 b"))
+    # planet mass errors must not leak onto stellar mass
+    assert "masserr1" not in result
+    assert (result["pl_raderr1"], result["pl_raderr2"]) == pytest.approx((0.2, 0.1))
+    assert (result["pl_masserr1"], result["pl_masserr2"]) == pytest.approx((0.4, 0.3))
+    assert (result["msinierr1"], result["msinierr2"]) == pytest.approx((0.6, 0.5))

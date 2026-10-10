@@ -30,11 +30,13 @@ class EuParamSource(ParamSource):
     }
     # note exoplanet.eu's "log_g" column actually means planetary surface gravity
 
+    # Keys must be field names from param_columns; tuples are (upper, lower)
+    # to match the err1/err2 convention, so *_error_max comes first.
     param_error_columns = {
-        "dist": ("star_distance_error_min", "star_distance_error_max"),
-        "radius": ("radius_error_min", "radius_error_max"),
-        "mass": ("mass_error_min", "mass_error_max"),
-        "pl_mass": ("mass_sin_i_error_min", "mass_sin_i_error_max")
+        "dist": ("star_distance_error_max", "star_distance_error_min"),
+        "pl_rad": ("radius_error_max", "radius_error_min"),
+        "pl_mass": ("mass_error_max", "mass_error_min"),
+        "msini": ("mass_sin_i_error_max", "mass_sin_i_error_min"),
     }
 
     def download(self, key_list: list[str] = None) -> Table:
