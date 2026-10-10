@@ -132,3 +132,12 @@ def test_no_err_when_absent():
     result = src.get(_emc_row("TOI-700.02"))
     assert "tefferr1" not in result
     assert "tefferr2" not in result
+
+
+def test_pl_rad_err_converted_to_jupiter_radii():
+    src = ToiParamSource()
+    _loaded(src, _toi_table({"toidisplay": "TOI-700.01", "pl_rade": 1.0,
+                             "pl_radeerr1": 0.2, "pl_radeerr2": -0.1}))
+    result = src.get(_emc_row("TOI-700.01"))
+    assert result["pl_raderr1"] == pytest.approx(0.2 * u.Rearth.to(u.Rjup))
+    assert result["pl_raderr2"] == pytest.approx(0.1 * u.Rearth.to(u.Rjup))

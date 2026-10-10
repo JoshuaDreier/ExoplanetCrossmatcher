@@ -96,3 +96,13 @@ def test_st_lum_log10_converted_to_linear():
     # dex errors are converted through the exponential, each side separately
     assert bright["lumerr1"] == pytest.approx(10 ** 1.05 - 10.0)
     assert bright["lumerr2"] == pytest.approx(10.0 - 10 ** 0.95)
+
+
+def test_msini_errors_included():
+    src = NeaParamSource()
+    table = _nea_table({"pl_name": "HD 1 b", "pl_msinij": 3.0})
+    table["pl_msinijerr1"] = [0.4]
+    table["pl_msinijerr2"] = [-0.3]
+    _loaded(src, table)
+    result = src.get(_emc_row("HD 1 b"))
+    assert (result["msinierr1"], result["msinierr2"]) == pytest.approx((0.4, 0.3))

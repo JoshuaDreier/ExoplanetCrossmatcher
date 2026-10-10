@@ -47,7 +47,7 @@ class EpicParamSource(ParamSource):
         'pl_eqt': ('pl_eqterr1', 'pl_eqterr2'),
         'pl_rad': ('pl_radjerr1', 'pl_radjerr2'),
         'pl_mass': ('pl_massjerr1', 'pl_massjerr2'),
-        'pl_msini': ('pl_msinijerr1', 'pl_msinijerr2'),
+        'msini': ('pl_msinijerr1', 'pl_msinijerr2'),
     }
 
     def download(self, key_list: list[str] = None) -> Table:

@@ -48,8 +48,10 @@ class ToiParamSource(ParamSource):
 
     def _build_lookup(self, table: Table) -> dict:
         lookup = _build_nea_style_lookup(table, self.param_columns, self.param_error_columns, key_col='toidisplay')
+        # convert earth radii to jupiter radii (value and its errors)
+        rearth_to_rjup = u.Rearth.to(u.Rjup)
         for _, valdict in lookup.items():
-            if "pl_rad" in valdict.keys():
-                valdict["pl_rad"] = valdict["pl_rad"]*u.Rearth.to(u.Rjup)
+            for key in ("pl_rad", "pl_raderr1", "pl_raderr2"):
+                if key in valdict:
+                    valdict[key] = valdict[key] * rearth_to_rjup
         return lookup
-        # convert earth radii to jupiter radii

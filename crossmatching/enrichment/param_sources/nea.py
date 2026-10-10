@@ -43,7 +43,7 @@ class NeaParamSource(ParamSource):
         'met': ('st_meterr1', 'st_meterr2'),
         'pl_eqt': ('pl_eqterr1', 'pl_eqterr2'),
         'pl_mass': ('pl_massjerr1', 'pl_massjerr2'),
-        'pl_msini': ('pl_msinijerr1', 'pl_msinijerr2'),
+        'msini': ('pl_msinijerr1', 'pl_msinijerr2'),
     }
 
     def download(self, key_list: list[str] = None) -> Table:

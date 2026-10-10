@@ -143,3 +143,12 @@ def test_met_err_zero_base_still_returns_err():
     assert "met" in result
     assert result["meterr1"] == pytest.approx(0.05)
     assert result["meterr1"] == pytest.approx(0.05)
+
+
+def test_msini_errors_included():
+    src = EpicParamSource()
+    src._lookup = src._build_lookup(_epic_table({
+        "pl_name": "K2-18 b", "pl_msinij": 3.0, "pl_msinijerr1": 0.4, "pl_msinijerr2": -0.3,
+    }))
+    result = src.get({"epic_name": "K2-18 b"})
+    assert (result["msinierr1"], result["msinierr2"]) == pytest.approx((0.4, 0.3))
